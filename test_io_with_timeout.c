@@ -6,11 +6,14 @@
 int main(void){
 
     fd_set readfds;       //On déclare un ensemble de descripteurs (pour les lectures)
+    fd_set writefds;       //.. popur les écrituress
     struct timeval outime; //pour définir l'interval de temps pendant lequel select doit attendre
     int ret;        //Valeur de retour de select
 
     FD_ZERO(&readfds); //initialisation du set
+    FD_ZERO(&writefds);
     FD_SET(0, &readfds); //ajout du descripteur du clavier dans l'ensemble des descripteurs de lecture
+    FD_SET(1, &writefds);
 
     /*On va définir notre délai. Ici on choisit d'attendre pendant 10s*/
     outime.tv_sec = 10; //Valeur en secondes
@@ -18,7 +21,7 @@ int main(void){
 
     char buff[255];
 
-    ret = select(1, &readfds, NULL, NULL, &outime);
+    ret = select(2, &readfds, &writefds, NULL, &outime);
 
     if (ret < 0)
     {
