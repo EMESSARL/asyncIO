@@ -51,7 +51,7 @@ int main(int argc, char *argv[]){
       if (with_time)
       {
       //   fprintf(stderr, "je suis dans le if\n");
-         ret_sel = select(2, &readset, &writeset, NULL, &out_time);
+         ret_sel = select(2, NULL, &writeset, NULL, &out_time);
       }else{
          fprintf(stderr,"Je suis dansle else plutot\n");
          sleep(10);
