@@ -47,11 +47,11 @@ int main(int argc, char *argv[]){
 
    while(1){
       FD_SET(0, &readset);
-      FD_SET(1, &writeset);
+     // FD_SET(1, &writeset);
       if (with_time)
       {
       //   fprintf(stderr, "je suis dans le if\n");
-         ret_sel = select(2, NULL, &writeset, NULL, &out_time);
+         ret_sel = select(2, &readset, &writeset, NULL, &out_time);
       }else{
          fprintf(stderr,"Je suis dansle else plutot\n");
          sleep(10);
