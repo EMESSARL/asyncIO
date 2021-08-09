@@ -40,6 +40,16 @@ int main(void){
             EXIT_SUCCESS;
             
         }
+        /*by celia*/
+         if(FD_ISSET(1, &writefds))
+        {
+        	ret = write(1, buff, 255);
+        	if (ret  > 0)
+        	{
+        		fprintf(stderr, "Ecriture de données\n");
+        	}
+        	EXIT_SUCCESS;
+        }
         
     }
     
