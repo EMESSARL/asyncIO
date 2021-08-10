@@ -43,7 +43,8 @@ int main(void){
         /*by celia*/
          if(FD_ISSET(1, &writefds))
         {
-        	ret = write(1, buff, 255);
+        	//ret = write(1, buff, 255); // C'est à cause de cette ligne qu'il y a des caractères biza
+            //rres à l'écran. Il tente d'extraire des données du buffer alors que ce dernier ne contient rien
         	if (ret  > 0)
         	{
         		fprintf(stderr, "Ecriture de données\n");
