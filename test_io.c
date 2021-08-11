@@ -73,6 +73,7 @@ int main(int argc, char *argv[]){
          write(pfd[1], buffer, strlen(buffer));
       }
       close(pfd[1]); //fermeture du pipe
+   }
       
       while ((c = getopt(argc, argv, "t")) != -1)
       {
@@ -133,5 +134,4 @@ int main(int argc, char *argv[]){
          FD_CLR(1, &writeset);
          }
       }
-   }
 }
