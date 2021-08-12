@@ -25,9 +25,9 @@ int main(int argc, char *argv[]){
   if(pid == 0){ /*Nous sommes dans le fils*/
     close(fd[1]); /* Le fils ferme l'extrémité d'écriture du pipe*/
      //fprintf(stderr,  "Nous sommes dans le fils(%d)\n", errno);
-     char buffer[10];
+     char buffer[255];
      while(1){ /* Le fils se met en attente de lecture des données du pipe*/
-      int n = read(fd[0], buffer, 10);
+      read(fd[0], buffer, 255);
       
       printf("Fils: Merci(%s)\n", buffer);
       if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
@@ -38,12 +38,12 @@ int main(int argc, char *argv[]){
   else{
     close(fd[0]); /* Le père ferme l'extrémité de lecture du pipe*/
     // fprintf(stderr,  "Nous sommes dans le père(%d)\n", errno);
-     fprintf(stdout, "Je suis (%d), mon père (%d)\n", getpid(), getppid());
+    fprintf(stdout, "Je suis le père\n");
      fprintf(stderr,  "Donnez moi votre nom (%d)\n", errno);
      char buffer[10];
      while(1){
-     scanf("%s", buffer); /* Le père lit une chaine de caractère saisie au clavier*/
-     write(fd[1], buffer, strlen(buffer)); /* le père écrit la chaine de caractère dans le pipe */
+     int n= scanf("%s", buffer); /* Le père lit une chaine de caractère saisie au clavier*/
+     write(fd[1], buffer, n); /* le père écrit la chaine de caractère dans le pipe */
      if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
         break;
     }
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
   FD_SET(fd[0], &readfds); //ajout du descripteur du clavier dans l'ensemble des descripteurs de lecture
   FD_SET(fd[1], &writefds);
   
-  char buff[255];
+  char buff[10];
   int rets;        //Valeur de retour de select
   while(1){
   
@@ -72,23 +72,11 @@ int main(int argc, char *argv[]){
      
   if (FD_ISSET(fd[0], &readfds)){
             printf("Yo les gars des données sont dispo, venez vite les récupérer\n");
-            rets = read(fd[0], buff, 255);
+            rets = read(fd[0], buff, 10);
             if(rets>0)
             	fprintf(stdout, "%s\n",buff);
         }
-   /*if(FD_ISSET(0, &readset)){
-      scanf("%c", &carac);
-      if(carac == '\n')
-        continue;
-        
-      ret = write(fd[1], carac, buff);
-      if(rets < 0){
-          fprintf(stdout, "Père (%d) impossible d'écrire sur fd[1] du pipe (%d)\n", getpid(), errno);
-          return 1;
-        }
-      if(carac == 'N')
-        break;
-    }*/
+   
     
   
     
