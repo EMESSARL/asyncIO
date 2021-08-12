@@ -46,7 +46,8 @@ int main(int argc, char *argv[]){
      fprintf(stderr,  "Donnez moi votre nom (%d)\n", errno);
      char buffer[10];
      while(1){
-     int n= scanf("%s", buffer); /* Le père lit une chaine de caractère saisie au clavier*/
+     //int n= scanf("%s", buffer); /* Le père lit une chaine de caractère saisie au clavier*/
+     int n = read(0, buffer, 10);
      int k = write(fd[1], buffer, n); /* le père écrit la chaine de caractère dans le pipe */
      printf("car sent (%d)\n", k);
      if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
