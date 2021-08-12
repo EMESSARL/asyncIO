@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/select.h>
 #include <stdlib.h>
+#include <fcntl.h>
  
 
 int main(int argc, char *argv[]){
@@ -13,6 +14,8 @@ int main(int argc, char *argv[]){
   pid_t pid;
   /* demande de création du pipe au système*/
   ret = pipe(fd);
+  /*fcntl(fd[0], F_SETFL, O_NONBLOCK );
+  fcntl(fd[1], F_SETFL, O_NONBLOCK );*/
   if(ret < 0){ /* Une erreur s'est produite lors de la création du pipe*/
     fprintf(stderr, "Erreur de création du pipe (%d)\n", errno);
     return 1;
@@ -27,10 +30,11 @@ int main(int argc, char *argv[]){
      //fprintf(stderr,  "Nous sommes dans le fils(%d)\n", errno);
      char buffer[255];
      while(1){ /* Le fils se met en attente de lecture des données du pipe*/
-      read(fd[0], buffer, 255);
+     
+     int m = read(fd[0], buffer, 255);
       
-      printf("Fils: Merci(%s)\n", buffer);
-      if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
+     printf("Fils: Merci(%s)(%d)\n", buffer,m);
+     if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
         break;
     }
     return 1;
@@ -43,7 +47,8 @@ int main(int argc, char *argv[]){
      char buffer[10];
      while(1){
      int n= scanf("%s", buffer); /* Le père lit une chaine de caractère saisie au clavier*/
-     write(fd[1], buffer, n); /* le père écrit la chaine de caractère dans le pipe */
+     int k = write(fd[1], buffer, n); /* le père écrit la chaine de caractère dans le pipe */
+     printf("car sent (%d)\n", k);
      if(strcmp(buffer, "N")==0) /* L'utilisateur met fin au programme*/
         break;
     }
