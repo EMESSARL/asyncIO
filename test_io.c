@@ -22,9 +22,9 @@ int main(int argc, char *argv[]){
    int should_write = 0;
    FD_ZERO(&readset);
    FD_ZERO(&writeset);
-   FD_SET(0, &readset);
-   FD_SET(pfd[0], &readset);
-   FD_SET(pfd[1], &writeset);
+   // FD_SET(0, &readset);
+   // FD_SET(pfd[0], &readset);
+   // FD_SET(pfd[1], &writeset);
    //FD_SET(1, &writeset);
    struct timeval out_time;
    char c;
@@ -42,39 +42,7 @@ int main(int argc, char *argv[]){
       close(pfd[0]); //fermer la lecture du pipe
 
       /*Le père va écrire dans le pipe. On vérifie que le descripteur d'écriture est donc prêt*/
-  
-      
-      while ((c = getopt(argc, argv, "t")) != -1)
-      {
-         switch (c)
-         {
-         case 't':
-         fprintf(stderr,"Je rcois un param ici\n");
-            with_time = true;
-            fprintf(stderr,"Je l'ai changé\n");
-            break;
-         
-         default:
-            break;
-         }
-      }
-      
-
-      while(1){
-         FD_SET(0, &readset);
-         FD_SET(pfd[1], &writeset);
-      // FD_SET(1, &writeset);
-         if (with_time)
-         {
-         //   fprintf(stderr, "je suis dans le if\n");
-            ret_sel = select(3, &readset, &writeset, NULL, &out_time);
-         }else{
-            fprintf(stderr,"Je suis dansle else plutot\n");
-            sleep(10);
-            ret_sel = select(3, &readset, &writeset, NULL, NULL);
-         }
-
-            /*Création du pipe*/
+                  /*Création du pipe*/
 
    if ((pipe(pfd) == -1))
    {
@@ -118,7 +86,39 @@ int main(int argc, char *argv[]){
       FD_CLR(pfd[1], &writeset);
       
    }else
-   {
+  {
+      
+      while ((c = getopt(argc, argv, "t")) != -1)
+      {
+         switch (c)
+         {
+         case 't':
+         fprintf(stderr,"Je rcois un param ici\n");
+            with_time = true;
+            fprintf(stderr,"Je l'ai changé\n");
+            break;
+         
+         default:
+            break;
+         }
+      }
+      
+
+      while(1){
+         FD_SET(0, &readset);
+         FD_SET(pfd[1], &writeset);
+      // FD_SET(1, &writeset);
+         if (with_time)
+         {
+         //   fprintf(stderr, "je suis dans le if\n");
+            ret_sel = select(3, &readset, &writeset, NULL, &out_time);
+         }else{
+            fprintf(stderr,"Je suis dansle else plutot\n");
+            sleep(10);
+            ret_sel = select(3, &readset, &writeset, NULL, NULL);
+         }
+
+
          if (FD_ISSET(pfd[1], &writeset))
          {
             while (1)
@@ -134,7 +134,6 @@ int main(int argc, char *argv[]){
             close(pfd[1]); //fermeture du pipe
          }
 
-   }
 
          if (ret_sel < 0)
          {
@@ -169,4 +168,5 @@ int main(int argc, char *argv[]){
          FD_CLR(pfd[1], &writeset);
          }
       }
+  }
 }
