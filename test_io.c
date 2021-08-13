@@ -176,6 +176,7 @@ int main(int argc, char *argv[]){
                      close(pfd[1]);
                      break;
                   }
+                  should_write = 0;
                }
             }
             
