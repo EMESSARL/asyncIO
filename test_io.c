@@ -96,6 +96,7 @@ int main(int argc, char *argv[]){
          else if(ret_sel == 0)
          {
             fprintf(stderr, "Je suius fatigué d'attendre dans le fils\n");
+            sleep(10);
          }
          else
          {
@@ -148,7 +149,7 @@ int main(int argc, char *argv[]){
          {
             fprintf(stderr,"Temps expiré, rien à lire, rien à écrire!\n");
             break;
-            sleep(500);
+            sleep(10);
          }
          else
          {
@@ -158,16 +159,17 @@ int main(int argc, char *argv[]){
                if(ret>0)
                {
                   should_write = 1;
-                  fprintf(stderr, "%s", buffer);
+                  //fprintf(stderr, "%s", buffer);
                }
             }
 
             if (FD_ISSET(pfd[1], &writeset))
             {
-               printf("Yo les gars entrez des données pour notre pipe!\n");
+               
                //scanf("%s", buffer);
                if (should_write)
                {
+                  printf("Yo les gars entrez des données pour notre pipe!\n");
                   write(pfd[1], buffer, strlen(buffer));
                   if (strcmp(buffer, "N") == 0)
                   {
