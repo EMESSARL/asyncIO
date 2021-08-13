@@ -18,7 +18,7 @@ int main(int argc, char *argv[]){
    fd_set readset, writeset;
    char buff[255];
    char buffer[BUFSIZ];
-   int ret, ret_sel;
+   int ret, ret_sel,fd_max;
    int should_write = 0;
    FD_ZERO(&readset);
    FD_ZERO(&writeset);
@@ -72,16 +72,22 @@ int main(int argc, char *argv[]){
 
    if (pid == 0)
    {
-     // FD_SET(1, &writeset);
-      FD_SET(pfd[1], &writeset);
+      // FD_SET(1, &writeset);
+      // FD_SET(pfd[1], &writeset);
+      fd_max = 0;
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
 
       while (1)
       {
-         FD_SET(0, &readset);
+         //FD_SET(0, &readset);
          FD_SET(pfd[0], &readset);
+         if (pfd[0] > fd_max)
+         {
+            fd_max = pfd[0];
+         }
+         
 
-         ret_sel = select(3, &readset, &writeset, NULL, &out_time);
+         ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
 
          if (ret_sel < 0)
          {
