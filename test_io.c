@@ -25,7 +25,7 @@ int main(int argc, char *argv[]){
    FD_SET(0, &readset);
    FD_SET(pfd[0], &readset);
    FD_SET(pfd[1], &writeset);
-   FD_SET(1, &writeset);
+   //FD_SET(1, &writeset);
    struct timeval out_time;
    char c;
    bool with_time = false;
@@ -35,45 +35,14 @@ int main(int argc, char *argv[]){
    
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
+   fcntl(pfd[0], F_SETFL, O_NONBLOCK);
+   fcntl(pfd[1], F_SETFL, O_NONBLOCK);
 
-   /*Création du pipe*/
 
-   if ((pipe(pfd) == -1))
-   {
-      printf("Erreur lors de la création du pipe\n");
-      return 1;
-   }
-
-   /*Créer un processus fils pour lire dans notre pipe*/
-   if ((pid = fork()) == -1)
-   {
-      printf("Echec de la création du processus fils\n");
-      return 1;
-   }
-
-   if (pid == 0)
-   {
-      /*Le processus fils va lire dans le pipe*/
-      close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
-      while (read(pfd[0],buffer, BUFSIZ) !=0)
-      {
-         printf("Le fils a lu: %s\n", buffer);
-      }
-      close(pfd[0]);
-      
-
-   }
-   else
-   {
       close(pfd[0]); //fermer la lecture du pipe
-      while (strcmp(buffer, "N") != 0)
-      {
-         printf("Veuillez saisir des données pour notre pipe\n");
-         scanf("%s", buffer);
-         write(pfd[1], buffer, strlen(buffer));
-      }
-      close(pfd[1]); //fermeture du pipe
-   }
+
+      /*Le père va écrire dans le pipe. On vérifie que le descripteur d'écriture est donc prêt*/
+  
       
       while ((c = getopt(argc, argv, "t")) != -1)
       {
@@ -98,12 +67,75 @@ int main(int argc, char *argv[]){
          if (with_time)
          {
          //   fprintf(stderr, "je suis dans le if\n");
-            ret_sel = select(2, &readset, &writeset, NULL, &out_time);
+            ret_sel = select(3, &readset, &writeset, NULL, &out_time);
          }else{
             fprintf(stderr,"Je suis dansle else plutot\n");
             sleep(10);
-            ret_sel = select(2, &readset, &writeset, NULL, NULL);
+            ret_sel = select(3, &readset, &writeset, NULL, NULL);
          }
+
+            /*Création du pipe*/
+
+   if ((pipe(pfd) == -1))
+   {
+      printf("Erreur lors de la création du pipe\n");
+      return 1;
+   }
+
+   /*Créer un processus fils pour lire dans notre pipe*/
+   if ((pid = fork()) == -1)
+   {
+      printf("Echec de la création du processus fils\n");
+      return 1;
+   }
+
+   if (pid == 0)
+   {
+      FD_SET(0, &readset);
+      FD_SET(pfd[0], &readset);
+     // FD_SET(1, &writeset);
+      FD_SET(pfd[1], &writeset);
+
+      ret_sel = select(3, &readset, &writeset, NULL, &out_time);
+      close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
+
+       /*Le processus fils va lire dans le pipe Mais avant faudra vérifier que le descripteur lecture du pipe est prêt*/
+
+      if (FD_ISSET(pfd[0], &readset))
+      {
+         while (1)
+         {
+            int n = read(pfd[0],buffer, BUFSIZ) !=0;
+            printf("Le fils a lu: %s\n", buffer);
+            if (strcmp(buffer, "N") == 0)
+            {
+               break;
+            }
+         } 
+         close(pfd[0]);
+      }
+      FD_CLR(pfd[0], &readset);
+      FD_CLR(pfd[1], &writeset);
+      
+   }else
+   {
+         if (FD_ISSET(pfd[1], &writeset))
+         {
+            while (1)
+            {
+               printf("Veuillez saisir des données pour notre pipe\n");
+               scanf("%s", buffer);
+               write(pfd[1], buffer, strlen(buffer));
+               if (strcmp(buffer, "N") ==0)
+               {
+                  break;
+               }
+            }
+            close(pfd[1]); //fermeture du pipe
+         }
+
+   }
+
          if (ret_sel < 0)
          {
             fprintf(stderr,"Une erreur est survenue!\n");
@@ -130,8 +162,11 @@ int main(int argc, char *argv[]){
                   }
             }
          }
+         
          FD_CLR(0, &readset);
          FD_CLR(1, &writeset);
+         FD_CLR(pfd[0], &readset);
+         FD_CLR(pfd[1], &writeset);
          }
       }
 }
