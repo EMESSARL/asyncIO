@@ -157,36 +157,30 @@ int main(int argc, char *argv[]){
                fprintf(stderr, "Quelque chose à lire\n");
                ret = read(0, buff, 255);
                if(ret>0)
-                  fprintf(stderr, "%s", buff);
-            }
-
-            if(FD_ISSET(1, &writeset)){
-               if(should_write){ //Cette condition est elle vraiment nécessaire???
-                  fprintf(stderr, "Quelques chose à écrire\n");
-                  int n = write(1, "Bonjour", 8);
-                  if (n < 0){
-                     fprintf(stderr, "Une erreur\n");
-                     //while(1);
-                  }
+               {
+                  should_write = 1;
+                  fprintf(stderr, "%s", buffer);
+               }
             }
 
             if (FD_ISSET(pfd[1], &writeset))
             {
                printf("Yo les gars entrez des données pour notre pipe!\n");
-               scanf("%s", buffer);
-               write(pfd[1], buffer, strlen(buffer));
-               if (strcmp(buffer, "N") == 0)
+               //scanf("%s", buffer);
+               if (should_write)
                {
-                  close(pfd[1]);
-                  break;
+                  write(pfd[1], buffer, strlen(buffer));
+                  if (strcmp(buffer, "N") == 0)
+                  {
+                     close(pfd[1]);
+                     break;
+                  }
                }
-               
             }
             
          }
          
          FD_CLR(0, &readset);
-         FD_CLR(1, &writeset);
          FD_CLR(pfd[1], &writeset);
          }
       }
