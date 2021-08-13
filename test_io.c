@@ -104,7 +104,7 @@ int main(int argc, char *argv[]){
             {
                int n = read(pfd[0],buffer, BUFSIZ) !=0;
                printf("%s", buffer);
-               if (strcmp(buffer, 0) == 0)
+               if (strcmp(buffer, "N") == 0)
                {
                   close(pfd[0]);
                   break;
@@ -161,6 +161,11 @@ int main(int argc, char *argv[]){
                   should_write = 1;
                   //fprintf(stderr, "%s", buffer);
                }
+               else if(ret == 0)
+               {
+                  write(pfd[1], "N", 1);
+                  break;
+               }
             }
 
             if (FD_ISSET(pfd[1], &writeset))
@@ -171,11 +176,7 @@ int main(int argc, char *argv[]){
                {
                   //printf("Yo les gars entrez des données pour notre pipe!\n");
                   write(pfd[1], buffer, strlen(buffer));
-                  if (strcmp(buffer, 0) == 0)
-                  {
-                     close(pfd[1]);
-                     break;
-                  }
+        
                   should_write = 0;
                }
             }
@@ -186,4 +187,6 @@ int main(int argc, char *argv[]){
          FD_CLR(pfd[1], &writeset);
       }
   }
+   //int status;
+   //int pid2 = wait(&status);
 }
