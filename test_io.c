@@ -12,7 +12,7 @@
 //#define false 0;
 
 int main(int argc, char *argv[]){
-   
+
    int pfd[2]; //pour le pipe
    pid_t pid;
    fd_set readset, writeset;
@@ -22,10 +22,6 @@ int main(int argc, char *argv[]){
    int should_write = 0;
    FD_ZERO(&readset);
    FD_ZERO(&writeset);
-   // FD_SET(0, &readset);
-   // FD_SET(pfd[0], &readset);
-   // FD_SET(pfd[1], &writeset);
-   //FD_SET(1, &writeset);
    struct timeval out_time;
    char c;
    bool with_time = false;
@@ -35,23 +31,22 @@ int main(int argc, char *argv[]){
    
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
-   fcntl(pfd[0], F_SETFL, O_NONBLOCK);
-   fcntl(pfd[1], F_SETFL, O_NONBLOCK);
+   
 
-         while ((c = getopt(argc, argv, "t")) != -1)
+   while ((c = getopt(argc, argv, "t")) != -1)
+   {
+      switch (c)
       {
-         switch (c)
-         {
          case 't':
-         fprintf(stderr,"Je rcois un param ici\n");
+            fprintf(stderr,"Je rcois un param ici\n");
             with_time = true;
             fprintf(stderr,"Je l'ai changé\n");
             break;
-         
          default:
             break;
-         }
       }
+   }
+
 
 
      // close(pfd[0]); //fermer la lecture du pipe
@@ -64,6 +59,9 @@ int main(int argc, char *argv[]){
       printf("Erreur lors de la création du pipe\n");
       return 1;
    }
+   
+   fcntl(pfd[0], F_SETFL, O_NONBLOCK);
+   fcntl(pfd[1], F_SETFL, O_NONBLOCK);
 
    /*Créer un processus fils pour lire dans notre pipe*/
    if ((pid = fork()) == -1)
@@ -74,36 +72,58 @@ int main(int argc, char *argv[]){
 
    if (pid == 0)
    {
-      FD_SET(0, &readset);
-      FD_SET(pfd[0], &readset);
      // FD_SET(1, &writeset);
       FD_SET(pfd[1], &writeset);
-
-      ret_sel = select(3, &readset, &writeset, NULL, &out_time);
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
 
+      while (1)
+      {
+         FD_SET(0, &readset);
+         FD_SET(pfd[0], &readset);
+
+         ret_sel = select(3, &readset, &writeset, NULL, &out_time);
+
+         if (ret_sel < 0)
+         {
+            fprintf(stderr, "Erreur du select dans le fils\n");
+         }
+         else if(ret_sel == 0)
+         {
+            fprintf(stderr, "Je suius fatigué d'attendre dans le fils\n");
+         }
+         else
+         {
+            if (FD_ISSET(pfd[0], &readset))
+            {
+               while (1)
+               {
+                  int n = read(pfd[0],buffer, BUFSIZ) !=0;
+                  printf("Le fils a lu: %s\n", buffer);
+                  if (strcmp(buffer, "N") == 0)
+                  {
+                     break;
+                  }
+               } 
+               close(pfd[0]);
+            }
+            FD_CLR(pfd[0], &readset);
+            FD_CLR(pfd[1], &writeset);
+         }
+         
+         
+      }//Fin while du select dans le fils
+      
+
+      
+      
        /*Le processus fils va lire dans le pipe Mais avant faudra vérifier que le descripteur lecture du pipe est prêt*/
 
-      if (FD_ISSET(pfd[0], &readset))
-      {
-         while (1)
-         {
-            int n = read(pfd[0],buffer, BUFSIZ) !=0;
-            printf("Le fils a lu: %s\n", buffer);
-            if (strcmp(buffer, "N") == 0)
-            {
-               break;
-            }
-         } 
-         close(pfd[0]);
-      }
-      FD_CLR(pfd[0], &readset);
-      FD_CLR(pfd[1], &writeset);
+
       
-   }else
+   }//FIn du if (si on est dans le fils)
+   else
   {
       
-
       while(1){
          FD_SET(0, &readset);
          FD_SET(pfd[1], &writeset);
