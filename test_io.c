@@ -39,7 +39,7 @@ int main(int argc, char *argv[]){
    fcntl(pfd[1], F_SETFL, O_NONBLOCK);
 
 
-      close(pfd[0]); //fermer la lecture du pipe
+     // close(pfd[0]); //fermer la lecture du pipe
 
       /*Le père va écrire dans le pipe. On vérifie que le descripteur d'écriture est donc prêt*/
                   /*Création du pipe*/
