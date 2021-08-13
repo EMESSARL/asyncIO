@@ -38,6 +38,21 @@ int main(int argc, char *argv[]){
    fcntl(pfd[0], F_SETFL, O_NONBLOCK);
    fcntl(pfd[1], F_SETFL, O_NONBLOCK);
 
+         while ((c = getopt(argc, argv, "t")) != -1)
+      {
+         switch (c)
+         {
+         case 't':
+         fprintf(stderr,"Je rcois un param ici\n");
+            with_time = true;
+            fprintf(stderr,"Je l'ai changé\n");
+            break;
+         
+         default:
+            break;
+         }
+      }
+
 
      // close(pfd[0]); //fermer la lecture du pipe
 
@@ -87,21 +102,6 @@ int main(int argc, char *argv[]){
       
    }else
   {
-      
-      while ((c = getopt(argc, argv, "t")) != -1)
-      {
-         switch (c)
-         {
-         case 't':
-         fprintf(stderr,"Je rcois un param ici\n");
-            with_time = true;
-            fprintf(stderr,"Je l'ai changé\n");
-            break;
-         
-         default:
-            break;
-         }
-      }
       
 
       while(1){
