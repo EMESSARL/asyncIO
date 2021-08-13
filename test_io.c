@@ -87,7 +87,7 @@ int main(int argc, char *argv[]){
          }
          
 
-         ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
+         ret_sel = select(fd_max+1, &readset, NULL, NULL, &out_time);
 
          if (ret_sel < 0)
          {
@@ -101,75 +101,57 @@ int main(int argc, char *argv[]){
          {
             if (FD_ISSET(pfd[0], &readset))
             {
-               while (1)
+               int n = read(pfd[0],buffer, BUFSIZ) !=0;
+               printf("Le fils a lu: %s\n", buffer);
+               if (strcmp(buffer, "N") == 0)
                {
-                  int n = read(pfd[0],buffer, BUFSIZ) !=0;
-                  printf("Le fils a lu: %s\n", buffer);
-                  if (strcmp(buffer, "N") == 0)
-                  {
-                     break;
-                  }
-               } 
-               close(pfd[0]);
-            }
+                  close(pfd[0]);
+                  break;
+               }
+            } 
+               
+         }
             FD_CLR(pfd[0], &readset);
-            FD_CLR(pfd[1], &writeset);
+            //FD_CLR(pfd[1], &writeset);
          }
          
          
       }//Fin while du select dans le fils
       
-
-      
-      
-       /*Le processus fils va lire dans le pipe Mais avant faudra vérifier que le descripteur lecture du pipe est prêt*/
-
-
-      
    }//FIn du if (si on est dans le fils)
    else
   {
-      
-      while(1){
-         FD_SET(0, &readset);
-         FD_SET(pfd[1], &writeset);
-      // FD_SET(1, &writeset);
-         if (with_time)
+     while(1){
+        fd_max = 0;
+        FD_SET(0, &readset);
+        FD_SET(pfd[1], &writeset);
+        if (pfd[1] > fd_max)
+        {
+           fd_max = pfd[1];
+        }
+        if (with_time)
+        {
+            //fprintf(stderr, "je suis dans le if\n");
+           ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
+        }
+         else
          {
-         //   fprintf(stderr, "je suis dans le if\n");
-            ret_sel = select(3, &readset, &writeset, NULL, &out_time);
-         }else{
             fprintf(stderr,"Je suis dansle else plutot\n");
             sleep(10);
-            ret_sel = select(3, &readset, &writeset, NULL, NULL);
+            ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
          }
-
-
-         if (FD_ISSET(pfd[1], &writeset))
-         {
-            while (1)
-            {
-               printf("Veuillez saisir des données pour notre pipe\n");
-               scanf("%s", buffer);
-               write(pfd[1], buffer, strlen(buffer));
-               if (strcmp(buffer, "N") ==0)
-               {
-                  break;
-               }
-            }
-            close(pfd[1]); //fermeture du pipe
-         }
-
 
          if (ret_sel < 0)
          {
-            fprintf(stderr,"Une erreur est survenue!\n");
-         }else if (ret_sel == 0)
+            fprintf(stderr,"Une erreur est survenue! dans le select du père\n");
+         }
+         else if (ret_sel == 0)
          {
             fprintf(stderr,"Temps expiré, rien à lire, rien à écrire!\n");
             break;
             sleep(500);
-         }else
+         }
+         else
          {
             if(FD_ISSET(0, &readset)){
                fprintf(stderr, "Quelque chose à lire\n");
@@ -177,6 +159,7 @@ int main(int argc, char *argv[]){
                if(ret>0)
                   fprintf(stderr, "%s", buff);
             }
+
             if(FD_ISSET(1, &writeset)){
                if(should_write){ //Cette condition est elle vraiment nécessaire???
                   fprintf(stderr, "Quelques chose à écrire\n");
@@ -186,11 +169,24 @@ int main(int argc, char *argv[]){
                      //while(1);
                   }
             }
+
+            if (FD_ISSET(pfd[1], &writeset))
+            {
+               printf("Yo les gars entrez des données pour notre pipe!\n");
+               scanf("%s", buffer);
+               write(pfd[1], buffer, strlen(buffer));
+               if (strcmp(buffer, "N") == 0)
+               {
+                  close(pfd[1]);
+                  break;
+               }
+               
+            }
+            
          }
          
          FD_CLR(0, &readset);
          FD_CLR(1, &writeset);
-         FD_CLR(pfd[0], &readset);
          FD_CLR(pfd[1], &writeset);
          }
       }
