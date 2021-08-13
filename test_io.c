@@ -112,13 +112,12 @@ int main(int argc, char *argv[]){
                
          }
             FD_CLR(pfd[0], &readset);
-            //FD_CLR(pfd[1], &writeset);
-         }
-         
+            //FD_CLR(pfd[1], &writeset);      
          
       }//Fin while du select dans le fils
       
    }//FIn du if (si on est dans le fils)
+
    else
   {
      while(1){
@@ -155,7 +154,7 @@ int main(int argc, char *argv[]){
          {
             if(FD_ISSET(0, &readset)){
                fprintf(stderr, "Quelque chose à lire\n");
-               ret = read(0, buff, 255);
+               ret = read(0, buffer, 255);
                if(ret>0)
                {
                   should_write = 1;
@@ -182,7 +181,6 @@ int main(int argc, char *argv[]){
          
          FD_CLR(0, &readset);
          FD_CLR(pfd[1], &writeset);
-         }
       }
   }
 }
