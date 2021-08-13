@@ -38,9 +38,9 @@ int main(int argc, char *argv[]){
       switch (c)
       {
          case 't':
-            fprintf(stderr,"Je rcois un param ici\n");
+            //fprintf(stderr,"Je rcois un param ici\n");
             with_time = true;
-            fprintf(stderr,"Je l'ai changé\n");
+            //fprintf(stderr,"Je l'ai changé\n");
             break;
          default:
             break;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]){
 
    if ((pipe(pfd) == -1))
    {
-      printf("Erreur lors de la création du pipe\n");
+      //printf("Erreur lors de la création du pipe\n");
       return 1;
    }
    
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]){
    /*Créer un processus fils pour lire dans notre pipe*/
    if ((pid = fork()) == -1)
    {
-      printf("Echec de la création du processus fils\n");
+      //printf("Echec de la création du processus fils\n");
       return 1;
    }
 
@@ -91,11 +91,11 @@ int main(int argc, char *argv[]){
 
          if (ret_sel < 0)
          {
-            fprintf(stderr, "Erreur du select dans le fils\n");
+            //fprintf(stderr, "Erreur du select dans le fils\n");
          }
          else if(ret_sel == 0)
          {
-            fprintf(stderr, "Je suius fatigué d'attendre dans le fils\n");
+            //fprintf(stderr, "Je suius fatigué d'attendre dans le fils\n");
             sleep(10);
          }
          else
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]){
             if (FD_ISSET(pfd[0], &readset))
             {
                int n = read(pfd[0],buffer, BUFSIZ) !=0;
-               printf("Le fils a lu: %s\n", buffer);
+               printf("%s", buffer);
                if (strcmp(buffer, "N") == 0)
                {
                   close(pfd[0]);
@@ -136,25 +136,25 @@ int main(int argc, char *argv[]){
         }
          else
          {
-            fprintf(stderr,"Je suis dansle else plutot\n");
+            //fprintf(stderr,"Je suis dansle else plutot\n");
             sleep(10);
             ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
          }
 
          if (ret_sel < 0)
          {
-            fprintf(stderr,"Une erreur est survenue! dans le select du père\n");
+            //fprintf(stderr,"Une erreur est survenue! dans le select du père\n");
          }
          else if (ret_sel == 0)
          {
-            fprintf(stderr,"Temps expiré, rien à lire, rien à écrire!\n");
+            //fprintf(stderr,"Temps expiré, rien à lire, rien à écrire!\n");
             break;
             sleep(10);
          }
          else
          {
             if(FD_ISSET(0, &readset)){
-               fprintf(stderr, "Quelque chose à lire\n");
+               //fprintf(stderr, "Quelque chose à lire\n");
                ret = read(0, buffer, 255);
                if(ret>0)
                {
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]){
                //scanf("%s", buffer);
                if (should_write)
                {
-                  printf("Yo les gars entrez des données pour notre pipe!\n");
+                  //printf("Yo les gars entrez des données pour notre pipe!\n");
                   write(pfd[1], buffer, strlen(buffer));
                   if (strcmp(buffer, "N") == 0)
                   {
