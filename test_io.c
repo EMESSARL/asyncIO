@@ -10,7 +10,7 @@
 #include <memory.h>
 #include <sys/wait.h>
 
-#define BUFFSIZE 131072
+#define BUFFSIZE 65536
 //#define false 0;
 
 int main(int argc, char *argv[]){
@@ -175,6 +175,10 @@ int main(int argc, char *argv[]){
                   break;
                  }
               }
+              else{
+                 if(offset)
+                     fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
+              }
                
             }
 
@@ -197,6 +201,7 @@ int main(int argc, char *argv[]){
                   }else{
                     should_write = 0;
                     offset = 0;
+                    //fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
                   //memset(buffer, 0, BUFFSIZE); 
                   }              
                }
