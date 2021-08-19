@@ -13,6 +13,12 @@
 #define BUFFSIZE 65536
 //#define false 0;
 
+
+void handle_alarm(int number){
+  fprintf(stderr, "\n%ld a recu le signal %d (%s)\n", 
+    (long) getpid(), number, strsignal(number));	        
+}
+
 int main(int argc, char *argv[]){
 
    int pfd[2]; //pour le pipe
@@ -23,25 +29,32 @@ int main(int argc, char *argv[]){
    int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0;
    int offset = 0, bytesrecved = 0;
    int should_write = 0;
-   FD_ZERO(&readset);
-   FD_ZERO(&writeset);
+   sigset_t pselect_set;
    struct timeval out_time;
    char c;
    bool with_time = false;
-
+   bool with_pselect = false;
+   
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
    
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
-   
+   FD_ZERO(&readset);
+   FD_ZERO(&writeset);
    memset(buffer, 0, BUFFSIZE);
    
-   while ((c = getopt(argc, argv, "t")) != -1){
+   sigemptyset(&pselect_set);
+   
+   
+   while ((c = getopt(argc, argv, "tp")) != -1){
       switch (c)
       {
          case 't':
             with_time = true;
+            break;
+         case 'p':
+            with_pselect = true;
             break;
          default:
             break;
@@ -66,6 +79,7 @@ int main(int argc, char *argv[]){
       long bytesrecv = 0;
       long byteswrite = 0;
       fd_max = 0;
+      pid_t ppid = getppid();
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
 
       while (1){
@@ -93,6 +107,8 @@ int main(int argc, char *argv[]){
             if (FD_ISSET(pfd[0], &readset)){
                if(!bytesrecved){
                   bytesrecved = read(pfd[0],buffer, BUFFSIZE);
+                  if(with_pselect)
+                     kill(ppid, SIGALRM);
                   if(bytesrecved < 0){
                      fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
                   }
@@ -139,6 +155,10 @@ int main(int argc, char *argv[]){
   {
      long bytessent = 0;
      long bytesread = 0;
+     if(with_pselect)
+        if (signal(SIGALRM, handle_alarm) == SIG_ERR)
+          fprintf(stderr, "Signal %d non capture\n", SIGALRM);
+
      while(1){
         fd_max = 0;
         FD_SET(0, &readset);
@@ -148,7 +168,11 @@ int main(int argc, char *argv[]){
         
         if (with_time)
            ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
-        else
+        else if(with_pselect){
+           sigaddset(&pselect_set, SIGALRM);
+           ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
+        }
+        else 
            ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
         
         if (ret_sel < 0){
