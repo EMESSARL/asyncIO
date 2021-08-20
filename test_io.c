@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
 		    if (FD_ISSET(pfd[0], &readset)){
 		       if(!bytesrecved){
 		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
-		          if(with_pselect)
+		          if(engine=2)
 		             kill(ppid, SIGALRM);
 		          if(bytesrecved < 0){
 		             fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
@@ -199,8 +199,6 @@ int main(int argc, char *argv[]){
 		     if(!bytesrecved){
 		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
 		          pfds[1].fd=POLLIN;
-		          if(with_pselect)
-		             kill(ppid, SIGALRM);
 		          if(bytesrecved < 0){
 		             fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
 		          }
