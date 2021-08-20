@@ -35,7 +35,7 @@ int main(int argc, char *argv[]){
    char c;
    bool with_time = false;
    bool with_pselect = false;
-   
+   bool with_poll = false;
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
    struct pollfd pfds[2];
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]){
          pfds[0].fd=1;
          pfds[1].fd=pfd[0];
          if(with_poll){
-           pfd[0].events= POLLOUT;
+           pfds[0].events= POLLOUT;
            pfds[1].events=POLLIN;
-           ret_sel =poll(pfds,2,&out_time);
+           ret_sel =poll(pfds,2,3);
            if(pfds[0].revents & POLLIN){
              if(!bytesrecved){
                   bytesrecved = read(pfd[0],buffer, BUFFSIZE);
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]){
                   }
                }
            }
-           if(pfd[1].events= POLLOUT){
+           if(pfds[1].events= POLLOUT){
               if(should_write){
                   int m = write(1, buffer+offset, bytesrecved);
                   if(m < 0)
@@ -228,9 +228,9 @@ int main(int argc, char *argv[]){
            ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
         }
         else if(with_poll){
-           pfd[0].events= POLLIN;
+           pfds[0].events= POLLIN;
            pfds[1].events=POLLOUT;
-           ret_sel =poll(pfds,2,&out_time);
+           ret_sel =poll(pfds,2,3);
            if(pfds[0].revents & POLLOUT){
             
             //scanf("%s", buffer);
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]){
                   }              
                }
            }
-           if(pfd[1].events= POLLIN){
+           if(pfds[1].events= POLLIN){
                   if(!bytestosend){
                   ret = read(0, buffer, BUFFSIZE);
                   if(ret < 0)
