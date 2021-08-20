@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <memory.h>
 #include <sys/wait.h>
+#include <poll.h>
 
 #define BUFFSIZE 65536
 //#define false 0;
@@ -37,7 +38,7 @@ int main(int argc, char *argv[]){
    
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
-   
+   struct pollfd pfds[2];
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
    FD_ZERO(&readset);
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]){
    sigemptyset(&pselect_set);
    
    
-   while ((c = getopt(argc, argv, "tp")) != -1){
+   while ((c = getopt(argc, argv, "tpo")) != -1){
       switch (c)
       {
          case 't':
@@ -55,6 +56,9 @@ int main(int argc, char *argv[]){
             break;
          case 'p':
             with_pselect = true;
+            break;
+         case 'o':
+            with_poll =true;
             break;
          default:
             break;
@@ -81,11 +85,13 @@ int main(int argc, char *argv[]){
       fd_max = 0;
       pid_t ppid = getppid();
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
-
+      
       while (1){
          FD_SET(1, &writeset);
          fd_max = 1;
          FD_SET(pfd[0], &readset);
+         pfds[0].fd=1;
+         pfds[1].fd=pfd[0];
          if (pfd[0] > fd_max)
             fd_max = pfd[0];
          ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
@@ -103,10 +109,12 @@ int main(int argc, char *argv[]){
          }
          else
          {
+            
             timeout = 0;
             if (FD_ISSET(pfd[0], &readset)){
                if(!bytesrecved){
                   bytesrecved = read(pfd[0],buffer, BUFFSIZE);
+                  pfds[1].fd=POLLIN;
                   if(with_pselect)
                      kill(ppid, SIGALRM);
                   if(bytesrecved < 0){
@@ -163,6 +171,8 @@ int main(int argc, char *argv[]){
         fd_max = 0;
         FD_SET(0, &readset);
         FD_SET(pfd[1], &writeset);
+        pfds[0].fd=0;
+        pfds[1].fd=pfd[1];
         if (pfd[1] > fd_max)
            fd_max = pfd[1];
         
@@ -171,6 +181,56 @@ int main(int argc, char *argv[]){
         else if(with_pselect){
            sigaddset(&pselect_set, SIGALRM);
            ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
+        }
+        else if(with_poll){
+           pfd[0].events= POLLIN;
+           pfds[1].events=POLLOUT;
+           ret_sel =poll(pfds,2,&out_time);
+           if(pfds[0].revents & POLLOUT){
+            
+            //scanf("%s", buffer);
+               if (should_write){
+                  ret = write(pfd[1], buffer+offset, bytestosend);
+                  if(ret < 0){
+                     fprintf(stderr, "il ya eu un problème lors de l'écriture %d\n", offset);
+                     //break;
+                  }
+                  bytessent += ret;
+                  bytestosend -= ret; 
+                  offset +=  ret;
+                  
+                  if(bytestosend){
+                     fprintf(stderr, "on a pas pu tout envoyer %d\n", bytestosend);
+                  }else{
+                    should_write = 0;
+                    offset = 0;
+                    //fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
+                  //memset(buffer, 0, BUFFSIZE); 
+                  }              
+               }
+           }
+           if(pfd[1].events= POLLIN){
+                  if(!bytestosend){
+                  ret = read(0, buffer, BUFFSIZE);
+                  if(ret < 0)
+                    fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
+                  else if(ret>0){
+                    should_write = 1;
+                    bytestosend += ret;
+                    bytesread +=ret;
+                 }
+                 else {
+                  fprintf(stderr, "end of father\n");
+                  break;
+                 }
+              }
+              else{
+                 if(offset)
+                     fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
+              }
+               
+            }
+           
         }
         else 
            ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
@@ -231,7 +291,8 @@ int main(int argc, char *argv[]){
                }
             }
             
-         }
+            
+        }
          
          FD_CLR(0, &readset);
          FD_CLR(pfd[1], &writeset);
