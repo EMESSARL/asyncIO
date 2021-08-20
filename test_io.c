@@ -27,7 +27,7 @@ int main(int argc, char *argv[]){
    fd_set readset, writeset;
    char buff[BUFFSIZE];
    char buffer[BUFFSIZE];
-   int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0;
+   int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0, engine=0;
    int offset = 0, bytesrecved = 0;
    int should_write = 0;
    sigset_t pselect_set;
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]){
             break;
          case 'o':
             //with_poll =true;
-            engine =1;
+            engine =3;
             break;
          default:
             break;
@@ -216,13 +216,19 @@ int main(int argc, char *argv[]){
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
 
      while(1){
-     	switch(a)
-     	{
+     	switch(engine){
      	   case 0:
      	     fd_max = 0;
-     	     FD_SET(0, &readset);
+             FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
+             if (pfd[1] > fd_max)
+                fd_max = pfd[1];
              break;
+             
+          case 0:
+          case 1:
+          case 2:
+             
            default:
              break;
      	}
