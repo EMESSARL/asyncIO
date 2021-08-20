@@ -213,6 +213,16 @@ int main(int argc, char *argv[]){
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
 
      while(1){
+     	switch(a)
+     	{
+     	   case 0:
+     	     fd_max = 0;
+     	     FD_SET(0, &readset);
+             FD_SET(pfd[1], &writeset);
+             break;
+           default:
+             break;
+     	}
         fd_max = 0;
         FD_SET(0, &readset);
         FD_SET(pfd[1], &writeset);
