@@ -92,6 +92,51 @@ int main(int argc, char *argv[]){
          FD_SET(pfd[0], &readset);
          pfds[0].fd=1;
          pfds[1].fd=pfd[0];
+         if(with_poll){
+           pfd[0].events= POLLOUT;
+           pfds[1].events=POLLIN;
+           ret_sel =poll(pfds,2,&out_time);
+           if(pfds[0].revents & POLLIN){
+             if(!bytesrecved){
+                  bytesrecved = read(pfd[0],buffer, BUFFSIZE);
+                  pfds[1].fd=POLLIN;
+                  if(with_pselect)
+                     kill(ppid, SIGALRM);
+                  if(bytesrecved < 0){
+                     fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
+                  }
+                  else if (bytesrecved == 0){
+                     close(pfd[0]);
+                     fprintf(stderr, "end of child\n");
+                     break;
+                  }
+                  else{
+                     bytesrecv +=bytesrecved;
+                     should_write = 1;
+                     offset = 0;
+                  }
+               }
+           }
+           if(pfd[1].events= POLLOUT){
+              if(should_write){
+                  int m = write(1, buffer+offset, bytesrecved);
+                  if(m < 0)
+                     fprintf(stderr, "un problème dans le fils %s", strerror(errno));
+                  else {  
+                     byteswrite +=m;
+                     offset +=m;
+                     bytesrecved -= m;
+                     if(!bytesrecved){
+                        should_write = 0;
+                        offset = 0;
+                     } 
+                  }
+                  
+               }
+           }
+           
+         }
+         
          if (pfd[0] > fd_max)
             fd_max = pfd[0];
          ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
