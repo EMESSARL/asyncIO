@@ -48,17 +48,20 @@ int main(int argc, char *argv[]){
    sigemptyset(&pselect_set);
    
    
-   while ((c = getopt(argc, argv, "tpo")) != -1){
-      switch (c)
+   while ((engine = getopt(argc, argv, "tpo")) != -1){
+      switch (engine)
       {
          case 't':
-            with_time = true;
+           // with_time = true;
+            engine =1;
             break;
          case 'p':
-            with_pselect = true;
+            //with_pselect = true;
+            engine =2;
             break;
          case 'o':
-            with_poll =true;
+            //with_poll =true;
+            engine =1;
             break;
          default:
             break;
