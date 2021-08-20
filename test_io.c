@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
    bool with_poll = false;
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
-   struct pollfd pfds[2];
+   //struct pollfd pfds[2];
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
    FD_ZERO(&readset);
@@ -226,14 +226,26 @@ int main(int argc, char *argv[]){
              if (pfd[1] > fd_max)
                 fd_max = pfd[1];
              break;
+           case 3:
+              pfds[0]=(struct pollfd){
+                 .fd=0,
+                 .events = POLLIN,
+                 .revents = 0
+              };
+              
+              pfds[1]=(struct pollfd){
+                 .fd=pfd[1],
+                 .events =POLLOUT,
+                 .revents = 0
+              };
            default:
              break;
      	}
-        fd_max = 0;
+        /*fd_max = 0;
         FD_SET(0, &readset);
         FD_SET(pfd[1], &writeset);
         pfds[0].fd=0;
-        pfds[1].fd=pfd[1];
+        pfds[1].fd=pfd[1];*/
         if (pfd[1] > fd_max)
            fd_max = pfd[1];
         
@@ -244,8 +256,8 @@ int main(int argc, char *argv[]){
            ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
         }
         else if(with_poll){
-           pfds[0].events= POLLIN;
-           pfds[1].events=POLLOUT;
+           /*pfds[0].events= POLLIN;
+           pfds[1].events=POLLOUT;*/
            ret_sel =poll(pfds,2,3);
            if(pfds[0].revents & POLLOUT){
             
