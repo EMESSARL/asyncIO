@@ -229,13 +229,13 @@ int main(int argc, char *argv[]){
            case 3:
               pfds[0]=(struct pollfd){
                  .fd=0,
-                 .events = POLLIN,
+                 .events = POLLIN | POLLERR,
                  .revents = 0
               };
               
               pfds[1]=(struct pollfd){
                  .fd=pfd[1],
-                 .events =POLLOUT,
+                 .events =POLLOUT | POLLERR,
                  .revents = 0
               };
            default:
@@ -245,11 +245,28 @@ int main(int argc, char *argv[]){
         FD_SET(0, &readset);
         FD_SET(pfd[1], &writeset);
         pfds[0].fd=0;
-        pfds[1].fd=pfd[1];*/
+        pfds[1].fd=pfd[1];
         if (pfd[1] > fd_max)
-           fd_max = pfd[1];
-        
-        if (with_time)
+           fd_max = pfd[1];*/
+           
+        switch(engine){
+           case 0:
+                ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
+                break;
+           case 1:
+                ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
+                break;
+           case 2:
+                sigaddset(&pselect_set, SIGALRM);
+                ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
+                break;
+           case 3:
+               ret_sel =poll(pfds,2,3);
+               break;
+           default:
+               break;
+        }
+    /*    if (with_time)
            ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
         else if(with_pselect){
            sigaddset(&pselect_set, SIGALRM);
@@ -257,8 +274,8 @@ int main(int argc, char *argv[]){
         }
         else if(with_poll){
            /*pfds[0].events= POLLIN;
-           pfds[1].events=POLLOUT;*/
-           ret_sel =poll(pfds,2,3);
+           pfds[1].events=POLLOUT;
+           ret_sel =poll(pfds,2,3);*/
            if(pfds[0].revents & POLLOUT){
             
             //scanf("%s", buffer);
