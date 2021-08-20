@@ -218,17 +218,14 @@ int main(int argc, char *argv[]){
      while(1){
      	switch(engine){
      	   case 0:
+     	   case 1:
+           case 2:
      	     fd_max = 0;
              FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
              if (pfd[1] > fd_max)
                 fd_max = pfd[1];
              break;
-             
-          case 0:
-          case 1:
-          case 2:
-             
            default:
              break;
      	}
