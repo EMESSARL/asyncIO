@@ -20,14 +20,16 @@ void handle_alarm(int number){
     (long) getpid(), number, strsignal(number));	        
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
 
    int pfd[2]; //pour le pipe
    pid_t pid;
    fd_set readset, writeset;
+   int engine = 0;
    char buff[BUFFSIZE];
    char buffer[BUFFSIZE];
-   int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0, engine=0;
+   int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0 ;
    int offset = 0, bytesrecved = 0;
    int should_write = 0;
    sigset_t pselect_set;
@@ -64,6 +66,7 @@ int main(int argc, char *argv[]){
             engine =3;
             break;
          default:
+         	engine =1;
             break;
       }
    }
@@ -88,18 +91,19 @@ int main(int argc, char *argv[]){
       fd_max = 0;
       pid_t ppid = getppid();
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
-      
+      fprintf(stderr, "On  est bien dans le fils\n");
       while (1){
          switch(engine){
      	   case 0:
      	   case 1:
-           case 2:
+     	   case 2:
+       
      	      FD_SET(1, &writeset);
               fd_max = 1;
               FD_SET(pfd[0], &readset);
               if (pfd[0] > fd_max)
                   fd_max = pfd[0];
-             break;
+              break;
            case 3:
               pfds[0]=(struct pollfd){
                  .fd=1,
@@ -112,8 +116,10 @@ int main(int argc, char *argv[]){
                  .events =POLLIN | POLLERR,
                  .revents = 0
               };
+              break;
            default:
-             break;
+              //fprintf(stderr, "On est dans le premier switch du fils\n");
+              break;
      	}
          
         switch(engine){
