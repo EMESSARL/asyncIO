@@ -50,8 +50,8 @@ int main(int argc, char *argv[])
    sigemptyset(&pselect_set);
    
    
-   while ((engine = getopt(argc, argv, "tpo")) != -1){
-      switch (engine)
+   while ((c = getopt(argc, argv, "tpo")) != -1){
+      switch (c)
       {
          case 't':
            // with_time = true;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
       fd_max = 0;
       pid_t ppid = getppid();
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
-      fprintf(stderr, "On  est bien dans le fils\n");
+      
       while (1){
          switch(engine){
      	   case 0:
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 		    if (FD_ISSET(pfd[0], &readset)){
 		       if(!bytesrecved){
 		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
-		          if(engine=2)
+		          if(engine==2)
 		             kill(ppid, SIGALRM);
 		          if(bytesrecved < 0){
 		             fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
@@ -278,6 +278,7 @@ int main(int argc, char *argv[])
                  .events =POLLOUT | POLLERR,
                  .revents = 0
               };
+              break;
            default:
              break;
      	}
