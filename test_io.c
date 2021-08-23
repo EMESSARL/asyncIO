@@ -30,16 +30,19 @@ int main(int argc, char *argv[])
    char buff[BUFFSIZE];
    char buffer[BUFFSIZE];
    int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0 ;
-   int offset = 0, bytesrecved = 0;
-   int should_write = 0;
+   int offset = 0, bytesrecved = 0 ;
+   int should_write = 0,i;
    sigset_t pselect_set;
    struct timeval out_time;
+   struct timespec out_time1;
    char c;
    bool with_time = false;
    bool with_pselect = false;
    bool with_poll = false;
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
+   out_time1.tv_sec=3;
+   out_time1.tv_nsec=3;
    struct pollfd pfds[2];
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
@@ -105,9 +108,9 @@ int main(int argc, char *argv[])
                   fd_max = pfd[0];
               break;
            case 3:
-              pfds[0]=(struct pollfd){
+             pfds[0]=(struct pollfd){
                  .fd=1,
-                 .events = POLLOUT | POLLERR,
+                 .events = POLLOUT| POLLERR,
                  .revents = 0
               };
               
@@ -116,6 +119,8 @@ int main(int argc, char *argv[])
                  .events =POLLIN | POLLERR,
                  .revents = 0
               };
+              nfds_t nfds=2;
+              int timeout =3;
               break;
            default:
               //fprintf(stderr, "On est dans le premier switch du fils\n");
@@ -131,10 +136,10 @@ int main(int argc, char *argv[])
                 break;
            case 2:
                 sigaddset(&pselect_set, SIGALRM);
-                ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
+                ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, &out_time1,&pselect_set );
                 break;
            case 3:
-               ret_sel =poll(pfds,2,3);
+             ret_sel =poll(pfds,2,0);
                break;
            default:
                break;
@@ -201,12 +206,21 @@ int main(int argc, char *argv[])
 		 FD_CLR(1, &writeset);  
                 break;
            case 3:
-                if(pfds[0].revents & POLLIN){
+               if (ret_sel < 0){
+                    fprintf(stderr,"Une erreur est survenue! dans le poll du fils\n");
+                    break;
+               }
+               else if (ret_sel == 0){
+                     fprintf(stderr,"Temps expiré, rien à lire, rien à écrire dans le fils!(avec poll)\n");
+               break;
+               }
+               else{
+                if(pfds[1].revents & POLLIN){
 		     if(!bytesrecved){
 		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
-		          pfds[1].fd=POLLIN;
+		          
 		          if(bytesrecved < 0){
-		             fprintf(stderr, "On a un petit problème lors du read dans le fils\n");
+		             fprintf(stderr, "On a un petit problème lors du read dans le fils(cas de poll)\n");
 		          }
 		          else if (bytesrecved == 0){
 		             close(pfd[0]);
@@ -217,11 +231,12 @@ int main(int argc, char *argv[])
 		             bytesrecv +=bytesrecved;
 		             should_write = 1;
 		             offset = 0;
+		               
 		          }
-		       }
+		       }  
                 }
-		 if(pfds[1].events= POLLOUT){
-		      if(should_write){
+		 if(pfds[0].events & POLLOUT){
+		 	if(should_write){
 		          int m = write(1, buffer+offset, bytesrecved);
 		          if(m < 0)
 		             fprintf(stderr, "un problème dans le fils %s", strerror(errno));
@@ -232,11 +247,15 @@ int main(int argc, char *argv[])
 		             if(!bytesrecved){
 		                should_write = 0;
 		                offset = 0;
+		            
 		             } 
 		          }
 		          
-		       }
-                }
+		       }  
+            
+               }
+                
+             }
                break;
            default:
                break;
@@ -275,9 +294,11 @@ int main(int argc, char *argv[])
               
               pfds[1]=(struct pollfd){
                  .fd=pfd[1],
-                 .events =POLLOUT | POLLERR,
+                 .events =POLLOUT ,
                  .revents = 0
               };
+              nfds_t nfd=2;
+              int timeout =-1, i;
               break;
            default:
              break;
@@ -295,7 +316,7 @@ int main(int argc, char *argv[])
                 ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
                 break;
            case 3:
-               ret_sel =poll(pfds,2,3);
+               ret_sel =poll(pfds,2,0);
                break;
            default:
                break;
@@ -366,10 +387,39 @@ int main(int argc, char *argv[])
                 break;
           
            case 3:
-               if(pfds[0].revents & POLLOUT){
-            
-		    //scanf("%s", buffer);
-		       if (should_write){
+                if (ret_sel < 0){
+                    fprintf(stderr,"Une erreur est survenue! dans le poll du père\n");
+                    break;
+               }
+               else if (ret_sel == 0){
+                     fprintf(stderr,"Temps expiré, rien à lire, rien à écrire dans le père!(avec poll)\n");
+               break;
+               }
+               else{
+		if(pfds[0].revents &  POLLIN){
+		        if(!bytestosend){
+		         ret = read(0, buffer, BUFFSIZE);
+		         if(ret < 0)
+		            fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
+		         else if(ret>0){
+		            should_write = 1;
+		            bytestosend += ret;
+		            bytesread +=ret;
+		            //write(1, buffer, BUFFSIZE);
+		         }
+		         else {
+		          fprintf(stderr, "end of father\n");
+		          break;
+		         }
+		      }
+		      else{
+		         if(offset)
+		             fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
+		      }    
+		       //write(1, buffer, BUFFSIZE);
+		}
+		if(pfds[1].revents & POLLOUT){
+                   if (should_write){
 		          ret = write(pfd[1], buffer+offset, bytestosend);
 		          if(ret < 0){
 		             fprintf(stderr, "il ya eu un problème lors de l'écriture %d\n", offset);
@@ -384,39 +434,20 @@ int main(int argc, char *argv[])
 		          }else{
 		            should_write = 0;
 		            offset = 0;
-		            //fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
+		           // fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
 		          //memset(buffer, 0, BUFFSIZE); 
 		          }              
 		       }
-		   }
-		   if(pfds[1].events= POLLIN){
-		          if(!bytestosend){
-		          ret = read(0, buffer, BUFFSIZE);
-		          if(ret < 0)
-		            fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
-		          else if(ret>0){
-		            should_write = 1;
-		            bytestosend += ret;
-		            bytesread +=ret;
-		         }
-		         else {
-		          fprintf(stderr, "end of father\n");
-		          break;
-		         }
-		      }
-		      else{
-		         if(offset)
-		             fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
-		      }
-		       
-		    }
+		     
+		}
+		}
                break;
            default:
                break;
-        }
+       
      
      
-           
+        }   
       }
    int status;
    fprintf(stderr, "waiting child bytesread (%ld), bytessent (%ld)\n", bytesread, bytessent);
