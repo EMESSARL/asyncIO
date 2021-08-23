@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <poll.h>
 
+
 #define BUFFSIZE 65536
 //#define false 0;
 
@@ -33,16 +34,20 @@ int main(int argc, char *argv[])
    int offset = 0, bytesrecved = 0 ;
    int should_write = 0,i;
    sigset_t pselect_set;
+   sigset_t ppoll_set;
    struct timeval out_time;
-   struct timespec out_time1;
+   struct timespec out_time1,out_time2;
    char c;
    bool with_time = false;
    bool with_pselect = false;
    bool with_poll = false;
+   bool with_ppoll = false;
    out_time.tv_sec = 3;
    out_time.tv_usec = 0;
-   out_time1.tv_sec=3;
-   out_time1.tv_nsec=3;
+   out_time1.tv_sec=5;
+   out_time1.tv_nsec=10;
+   out_time2.tv_sec=10;
+   out_time2.tv_nsec=10;
    struct pollfd pfds[2];
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
@@ -51,25 +56,30 @@ int main(int argc, char *argv[])
    memset(buffer, 0, BUFFSIZE);
    
    sigemptyset(&pselect_set);
+   sigemptyset(&ppoll_set);
    
    
-   while ((c = getopt(argc, argv, "tpo")) != -1){
-      switch (c)
-      {
+   while ((c = getopt(argc, argv, "tpol")) != -1){
+      
+      switch (c){
          case 't':
            // with_time = true;
             engine =1;
             break;
          case 'p':
-            //with_pselect = true;
+            with_pselect = true;
             engine =2;
             break;
          case 'o':
             //with_poll =true;
             engine =3;
             break;
+         case 'l':
+            with_ppoll = true;
+            engine =4;
+            break;
          default:
-         	engine =1;
+         	//engine =1;
             break;
       }
    }
@@ -108,6 +118,7 @@ int main(int argc, char *argv[])
                   fd_max = pfd[0];
               break;
            case 3:
+           case 4:
              pfds[0]=(struct pollfd){
                  .fd=1,
                  .events = POLLOUT| POLLERR,
@@ -119,8 +130,6 @@ int main(int argc, char *argv[])
                  .events =POLLIN | POLLERR,
                  .revents = 0
               };
-              nfds_t nfds=2;
-              int timeout =3;
               break;
            default:
               //fprintf(stderr, "On est dans le premier switch du fils\n");
@@ -141,6 +150,9 @@ int main(int argc, char *argv[])
            case 3:
              ret_sel =poll(pfds,2,0);
                break;
+           case 4:
+           	sigaddset(&ppoll_set, SIGALRM);
+                ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
            default:
                break;
         }
@@ -206,6 +218,7 @@ int main(int argc, char *argv[])
 		 FD_CLR(1, &writeset);  
                 break;
            case 3:
+           case 4:
                if (ret_sel < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le poll du fils\n");
                     break;
@@ -218,7 +231,8 @@ int main(int argc, char *argv[])
                 if(pfds[1].revents & POLLIN){
 		     if(!bytesrecved){
 		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
-		          
+		          if(engine==4)
+		             kill(ppid, SIGALRM);
 		          if(bytesrecved < 0){
 		             fprintf(stderr, "On a un petit problème lors du read dans le fils(cas de poll)\n");
 		          }
@@ -273,6 +287,9 @@ int main(int argc, char *argv[])
      if(with_pselect)
         if (signal(SIGALRM, handle_alarm) == SIG_ERR)
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
+     if(with_ppoll)
+        if (signal(SIGALRM, handle_alarm) == SIG_ERR)
+          fprintf(stderr, "Signal %d non capture\n", SIGALRM);
 
      while(1){
      	switch(engine){
@@ -286,6 +303,7 @@ int main(int argc, char *argv[])
                 fd_max = pfd[1];
              break;
            case 3:
+           case 4:
               pfds[0]=(struct pollfd){
                  .fd=0,
                  .events = POLLIN | POLLERR,
@@ -316,8 +334,12 @@ int main(int argc, char *argv[])
                 ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
                 break;
            case 3:
+           	
                ret_sel =poll(pfds,2,0);
                break;
+          case 4:
+             sigaddset(&ppoll_set, SIGALRM);
+             ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
            default:
                break;
         }
@@ -387,6 +409,7 @@ int main(int argc, char *argv[])
                 break;
           
            case 3:
+           case 4:
                 if (ret_sel < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le poll du père\n");
                     break;
