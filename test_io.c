@@ -10,11 +10,12 @@
 #include <memory.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <sys/epoll.h>
 
 
 #define BUFFSIZE 65536
 //#define false 0;
-
+#define MAX_EVENTS 5
 
 void handle_alarm(int number){
   fprintf(stderr, "\n%ld a recu le signal %d (%s)\n", 
@@ -37,6 +38,7 @@ int main(int argc, char *argv[])
    sigset_t ppoll_set;
    struct timeval out_time;
    struct timespec out_time1,out_time2;
+   struct epoll_event event1, event2, events[MAX_EVENTS];
    char c;
    bool with_time = false;
    bool with_pselect = false;
@@ -53,13 +55,14 @@ int main(int argc, char *argv[])
    fcntl(1, F_SETFL, O_NONBLOCK );
    FD_ZERO(&readset);
    FD_ZERO(&writeset);
-   memset(buffer, 0, BUFFSIZE);
-   
+   memset(buffer, 0, BUFFSIZE); 
    sigemptyset(&pselect_set);
    sigemptyset(&ppoll_set);
+   int epoll_fd, event_count;
+    
    
    
-   while ((c = getopt(argc, argv, "tpol")) != -1){
+   while ((c = getopt(argc, argv, "tpole")) != -1){
       
       switch (c){
          case 't':
@@ -78,8 +81,11 @@ int main(int argc, char *argv[])
             with_ppoll = true;
             engine =4;
             break;
+         case 'e':
+            engine =5;
+            break;
          default:
-         	//engine =1;
+            engine =0;
             break;
       }
    }
@@ -106,6 +112,7 @@ int main(int argc, char *argv[])
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
       
       while (1){
+      
          switch(engine){
      	   case 0:
      	   case 1:
@@ -131,8 +138,41 @@ int main(int argc, char *argv[])
                  .revents = 0
               };
               break;
+           case 5:
+	         
+		  epoll_fd = epoll_create1(0);
+		 
+		  if(epoll_fd == -1)
+		  {
+		    fprintf(stderr, "erreur de creation du descripteur de fichier pour epoll\n");
+		    return 1;
+		  }
+		 
+		  event1=(struct epoll_event){
+		     .events = EPOLLIN,
+		     .data.fd = pfd[0],
+		  };
+		  event2=(struct epoll_event){
+		     .events = EPOLLOUT,
+		     .data.fd = 1,
+		  }; 
+		 
+		  if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pfd[0], &event1))
+		  {
+		    fprintf(stderr, " Impossible d'ajouter  pfd[0]  au descipteur de fichier de epoll\n");
+		    close(epoll_fd);
+		    return 1;
+		  }
+		  if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD,1, &event2))
+		  {
+		    fprintf(stderr, "Impossible d'ajouter 1  au descipteur de fichier de epoll\n");
+		    close(epoll_fd);
+		    return 1;
+		  }	 
+		
+		  break;
            default:
-              //fprintf(stderr, "On est dans le premier switch du fils\n");
+               
               break;
      	}
          
@@ -153,6 +193,10 @@ int main(int argc, char *argv[])
            case 4:
            	sigaddset(&ppoll_set, SIGALRM);
                 ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
+                break;
+           case 5:        
+               event_count= epoll_wait(epoll_fd, events,MAX_EVENTS,3000);
+               break;
            default:
                break;
         }
@@ -271,10 +315,75 @@ int main(int argc, char *argv[])
                 
              }
                break;
+           case 5:
+           if ( event_count < 0){
+                    fprintf(stderr,"Une erreur est survenue! dans le poll du fils\n");
+                    return 1;
+               }
+               
+               
+            else  if ( event_count == -1) {
+                   printf("epoll_wait");
+                   exit(EXIT_FAILURE);
+                   return 1;
+              }
+             else{
+              for(int i = 0; i < event_count; i++){
+                 if (events[i].events & EPOLLIN){
+                   if(!bytesrecved){
+		          bytesrecved = read(pfd[0],buffer, BUFFSIZE);
+		          if(engine==4)
+		             kill(ppid, SIGALRM);
+		          if(bytesrecved < 0){
+		             fprintf(stderr, "On a un petit problème lors du read dans le fils(cas de poll)\n");
+		          }
+		          else if (bytesrecved == 0){
+		             close(pfd[0]);
+		             fprintf(stderr, "end of child\n");
+		             break;
+		          }
+		          else{
+		             bytesrecv +=bytesrecved;
+		             should_write = 1;
+		             offset = 0;
+		               
+		          }
+		       }  
+                 }
+                 else if(events[i].events & EPOLLOUT){
+                 
+                   if(should_write){
+		          int m = write(1, buffer+offset, bytesrecved);
+		          if(m < 0)
+		             fprintf(stderr, "un problème dans le fils %s", strerror(errno));
+		          else {  
+		             byteswrite +=m;
+		             offset +=m;
+		             bytesrecved -= m;
+		             if(!bytesrecved){
+		                should_write = 0;
+		                offset = 0;
+		            
+		             } 
+		          }
+		          
+		       }  
+                 }
+                
+              }
+              }
+              if(close(epoll_fd))
+	       {
+		    fprintf(stderr, "Impossible de fermer le descripteur de fichier epoll\n");
+		    return 1;
+	        }
+		 
+		 return 1;
+              break;
            default:
                break;
-        }
-         
+        
+        } 
       }//Fin while du select dans le fils
       close(pfd[0]);
       exit(0);
@@ -315,9 +424,40 @@ int main(int argc, char *argv[])
                  .events =POLLOUT ,
                  .revents = 0
               };
-              nfds_t nfd=2;
-              int timeout =-1, i;
+              
               break;
+           case 5:
+                epoll_fd = epoll_create1(0);
+		 
+		  if(epoll_fd == -1)
+		  {
+		    fprintf(stderr, "erreur de creation du descripteur de fichier pour epoll\n");
+		    return 1;
+		  }
+		 
+		  event1=(struct epoll_event){
+		     .events = EPOLLIN,
+		     .data.fd = 0,
+		  };
+		  event2=(struct epoll_event){
+		     .events = EPOLLOUT,
+		     .data.fd = pfd[1],
+		  }; 
+		 
+		  if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, 0, &event1))
+		  {
+		    fprintf(stderr, "Impossible d'ajouter pfd[1] au descipteur de fichier de epoll\n");
+		    close(epoll_fd);
+		    return 1;
+		  }
+		  if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD,pfd[1], &event2))
+		  {
+		    fprintf(stderr, " Impossible d'ajouter 0  au descipteur de fichier de epoll\n");
+		    close(epoll_fd);
+		    return 1;
+		  }
+		break;
+		 
            default:
              break;
      	}
@@ -340,6 +480,12 @@ int main(int argc, char *argv[])
           case 4:
              sigaddset(&ppoll_set, SIGALRM);
              ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
+             break;
+           case 5:
+              
+               event_count= epoll_wait(epoll_fd, events,MAX_EVENTS,1);
+               
+               break;
            default:
                break;
         }
@@ -465,10 +611,76 @@ int main(int argc, char *argv[])
 		}
 		}
                break;
+           case 5:
+                 if ( event_count < 0){
+                    fprintf(stderr,"Une erreur est survenue! dans le epoll du père\n");
+                    break;
+               }
+               
+               
+            else  if ( event_count == -1) {
+                   printf("epoll_wait");
+                   exit(EXIT_FAILURE);
+                   break;
+              }
+             else{
+              	for(int i = 0; i < event_count; i++){
+                 if (events[i].events & EPOLLIN){
+                    if(!bytestosend){
+		         ret = read(0, buffer, BUFFSIZE);
+		         if(ret < 0)
+		            fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
+		         else if(ret>0){
+		            should_write = 1;
+		            bytestosend += ret;
+		            bytesread +=ret;
+		            write(1, buffer, BUFFSIZE);
+		         }
+		         else {
+		          fprintf(stderr, "end of father\n");
+		          break;
+		         }
+		      }
+		      else{
+		         if(offset)
+		             fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
+		      }     
+                 }
+                 else if(events[i].events & EPOLLOUT){
+                 
+                    if (should_write){
+		          ret = write(pfd[1], buffer+offset, bytestosend);
+		          if(ret < 0){
+		             fprintf(stderr, "il ya eu un problème lors de l'écriture %d\n", offset);
+		             //break;
+		          }
+		          bytessent += ret;
+		          bytestosend -= ret; 
+		          offset +=  ret;
+		          
+		          if(bytestosend){
+		             fprintf(stderr, "on a pas pu tout envoyer %d\n", bytestosend);
+		          }else{
+		            should_write = 0;
+		            offset = 0;
+		           fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
+		          //memset(buffer, 0, BUFFSIZE); 
+		          }              
+		       }
+		      }
+                 }
+                
+              }
+              if(close(epoll_fd))
+		  {
+		    fprintf(stderr, "Impossible de fermer le descripteur de fichier epoll\n");
+		    return 1;
+		  }
+		 
+              break;
            default:
                break;
        
-     
      
         }   
       }
