@@ -1,3 +1,4 @@
+#define _GNU_SOURCE    
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -514,7 +515,7 @@ int main(int argc, char *argv[])
 		            bytesread +=ret;
 		         }
 		         else {
-		          fprintf(stderr, "end of father\n");
+		      //    fprintf(stderr, "end of father\n");
 		          break;
 		         }
 		      }
