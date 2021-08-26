@@ -13,6 +13,7 @@
 #include <poll.h>
 #include <sys/epoll.h>
 
+#include "test_io.h"
 
 #define BUFFSIZE 65536
 //#define false 0;
@@ -68,25 +69,25 @@ int main(int argc, char *argv[])
       switch (c){
          case 't':
            // with_time = true;
-            engine =1;
+            engine = SELECT_WITH_TIME_ENGINE;
             break;
          case 'p':
             with_pselect = true;
-            engine =2;
+            engine = PSELECT_ENGINE;
             break;
          case 'o':
             //with_poll =true;
-            engine =3;
+            engine = POLL_ENGINE;
             break;
          case 'l':
             with_ppoll = true;
-            engine =4;
+            engine = PPOLL_ENGINE;
             break;
          case 'e':
-            engine =5;
+            engine = EPOLL_ENGINE;
             break;
          default:
-            engine =0;
+            engine = NO_ENGINE;
             break;
       }
    }
@@ -447,7 +448,7 @@ int main(int argc, char *argv[])
 		 
 		  if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, 0, &event1))
 		  {
-		    fprintf(stderr, "Impossible d'ajouter pfd[1] au descipteur de fichier de epoll\n");
+		    fprintf(stderr, "Impossible d'ajouter pfd[1] au descipteur de fichier de epoll %s\n", strerror(errno));
 		    close(epoll_fd);
 		    return 1;
 		  }
