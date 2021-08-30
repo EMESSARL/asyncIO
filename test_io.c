@@ -14,7 +14,12 @@
 #include <sys/epoll.h>
 
 #include "test_io.h"
-
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#define MAX 80
+#define PORT 8080
+#define SA struct sockaddr
 #define BUFFSIZE 65536
 //#define false 0;
 #define MAX_EVENTS 5
@@ -36,11 +41,13 @@ int main(int argc, char *argv[])
    int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0 ;
    int offset = 0, bytesrecved = 0 ;
    int should_write = 0,i;
+    int sockfd, connfd, len;
    sigset_t pselect_set;
    sigset_t ppoll_set;
    struct timeval out_time;
    struct timespec out_time1,out_time2;
    struct epoll_event event1, event2, events[MAX_EVENTS];
+   struct sockaddr_in servaddr, cli;
    char c;
    bool with_time = false;
    bool with_pselect = false;
@@ -64,7 +71,7 @@ int main(int argc, char *argv[])
     
    
    
-   while ((c = getopt(argc, argv, "tpole")) != -1){
+   while ((c = getopt(argc, argv, "tpolesc")) != -1){
       
       switch (c){
          case 't':
@@ -85,6 +92,12 @@ int main(int argc, char *argv[])
             break;
          case 'e':
             engine = EPOLL_ENGINE;
+            break;
+         case 's':
+            engine = SERVER_ENGINE;
+            break;
+         case 'c':
+            engine = CLIENT_ENGINE;
             break;
          default:
             engine = NO_ENGINE;
@@ -116,9 +129,9 @@ int main(int argc, char *argv[])
       while (1){
       
          switch(engine){
-     	   case 0:
-     	   case 1:
-     	   case 2:
+     	   case SELECT_WITH_TIME_ENGINE:
+     	  // case PSELECT_ENGINE:
+     	   case PSELECT_ENGINE:
        
      	      FD_SET(1, &writeset);
               fd_max = 1;
@@ -126,8 +139,8 @@ int main(int argc, char *argv[])
               if (pfd[0] > fd_max)
                   fd_max = pfd[0];
               break;
-           case 3:
-           case 4:
+           case POLL_ENGINE:
+           case PPOLL_ENGINE:
              pfds[0]=(struct pollfd){
                  .fd=1,
                  .events = POLLOUT| POLLERR,
@@ -140,7 +153,7 @@ int main(int argc, char *argv[])
                  .revents = 0
               };
               break;
-           case 5:
+           case EPOLL_ENGINE:
 	         
 		  epoll_fd = epoll_create1(0);
 		 
@@ -179,33 +192,33 @@ int main(int argc, char *argv[])
      	}
          
         switch(engine){
-           case 0:
+           case SELECT_WITH_TIME_ENGINE:
                 ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
                 break;
-           case 1:
+          // case 1:
                 ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
                 break;
-           case 2:
+           case PSELECT_ENGINE:
                 sigaddset(&pselect_set, SIGALRM);
                 ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, &out_time1,&pselect_set );
                 break;
-           case 3:
+           case POLL_ENGINE:
              ret_sel =poll(pfds,2,0);
                break;
-           case 4:
+           case PPOLL_ENGINE:
            	sigaddset(&ppoll_set, SIGALRM);
                 ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
                 break;
-           case 5:        
+           case EPOLL_ENGINE:        
                event_count= epoll_wait(epoll_fd, events,MAX_EVENTS,3000);
                break;
            default:
                break;
         }
          switch(engine){
-           case 0:       
-           case 1:      
-           case 2:
+           case SELECT_WITH_TIME_ENGINE:       
+           //case 1:      
+           case PSELECT_ENGINE:
                 if (ret_sel < 0){
 		    fprintf(stderr, "Erreur du select dans le fils\n");
 		    return 1;
@@ -263,8 +276,8 @@ int main(int argc, char *argv[])
 		 FD_CLR(pfd[0], &readset);
 		 FD_CLR(1, &writeset);  
                 break;
-           case 3:
-           case 4:
+           case POLL_ENGINE:
+           case PPOLL_ENGINE:
                if (ret_sel < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le poll du fils\n");
                     break;
@@ -317,7 +330,7 @@ int main(int argc, char *argv[])
                 
              }
                break;
-           case 5:
+           case EPOLL_ENGINE:
            if ( event_count < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le poll du fils\n");
                     return 1;
@@ -404,16 +417,16 @@ int main(int argc, char *argv[])
 
      while(1){
      	switch(engine){
-     	   case 0:
-     	   case 1:
-           case 2:
+     	   case SELECT_WITH_TIME_ENGINE:
+     	  // case 1:
+           case PSELECT_ENGINE:
      	     fd_max = 0;
              FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
              if (pfd[1] > fd_max)
                 fd_max = pfd[1];
              break;
-           case 3:
+           case POLL_ENGINE:
            case 4:
               pfds[0]=(struct pollfd){
                  .fd=0,
@@ -428,7 +441,7 @@ int main(int argc, char *argv[])
               };
               
               break;
-           case 5:
+           case EPOLL_ENGINE:
                 epoll_fd = epoll_create1(0);
 		 
 		  if(epoll_fd == -1)
@@ -459,43 +472,114 @@ int main(int argc, char *argv[])
 		    return 1;
 		  }
 		break;
-		 
-           default:
-             break;
-     	}
+           case CLIENT_ENGINE :
+              
+              //Creation de la socket et verification
+              sockfd = socket(AF_INET, SOCK_STREAM, 0);
+		       
+	      if (sockfd == -1) {
+		  printf("Echec de creation du socket...\n");
+		  exit(0);
+	      }
+	     else
+		printf("Socket correctement crée..\n");
+		//bzero(&servaddr, sizeof(servaddr));
+		// assign IP, PORT
+		servaddr.sin_family = AF_INET;
+               servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+      	       servaddr.sin_port = htons(PORT);
+	     break;
+	     
+	  case  SERVER_ENGINE:
+	        //Creation de la socket et verification
+              sockfd = socket(AF_INET, SOCK_STREAM, 0);
+		       
+	      if (sockfd == -1) {
+		  printf("Echec de creation du socket...\n");
+		  exit(0);
+	      }
+	     else
+		printf("Socket correctement crée..\n");
+		bzero(&servaddr, sizeof(servaddr));
+		// assign IP, PORT
+		servaddr.sin_family = AF_INET;
+                servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+      	        servaddr.sin_port = htons(PORT);
+	     break;
+	  default:
+		break;
+	    }
          
         switch(engine){
-           case 0:
+           case SELECT_WITH_TIME_ENGINE:
                 ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
                 break;
-           case 1:
+         //  case 1:
                 ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
                 break;
-           case 2:
+           case PSELECT_ENGINE:
                 sigaddset(&pselect_set, SIGALRM);
                 ret_sel = pselect(fd_max+1, &readset, &writeset, NULL, NULL, &pselect_set);
                 break;
-           case 3:
+           case POLL_ENGINE:
            	
                ret_sel =poll(pfds,2,0);
                break;
-          case 4:
+          case PPOLL_ENGINE:
              sigaddset(&ppoll_set, SIGALRM);
              ret_sel = ppoll(pfds,2,&out_time2,&ppoll_set);
              break;
-           case 5:
+           case EPOLL_ENGINE:
               
                event_count= epoll_wait(epoll_fd, events,MAX_EVENTS,1);
                
                break;
+           case CLIENT_ENGINE:
+              // connection du socket client au socket serveur
+		if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
+			printf("Echec de la connexion au serveur...\n");
+			exit(0);
+		}
+		else
+			printf("Connexion reussi..\n");
+	      break;
+           case SERVER_ENGINE:
+                // Binding newly created socket to given IP and verification
+		if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
+			printf("socket bind failed...\n");
+			exit(0);
+		}
+		else
+			printf("Socket successfully binded..\n");
+
+		// Now server is ready to listen and verification
+		if ((listen(sockfd, 5)) != 0) {
+			printf("Listen failed...\n");
+			exit(0);
+		}
+		else
+			printf("Server listening..\n");
+		len = sizeof(cli);
+		// Accept the data packet from client and verification
+	   // Accept the data packet from client and verification
+		 connfd = accept(sockfd, (SA*)&cli, &len);
+	         if (connfd < 0) {
+			printf("server acccept failed...\n");
+			exit(0);
+	         }
+	        else
+			printf("server acccept the client...\n");
+			
+		break;
+
            default:
                break;
         }
         
         switch(engine){
-           case 0:
-           case 1:
-           case 2:
+           case SELECT_WITH_TIME_ENGINE:
+         //  case 1:
+           case PSELECT_ENGINE:
                  if (ret_sel < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le select du père\n");
                  break;
@@ -556,8 +640,8 @@ int main(int argc, char *argv[])
 		 FD_CLR(pfd[1], &writeset);
                 break;
           
-           case 3:
-           case 4:
+           case POLL_ENGINE:
+           case PPOLL_ENGINE:
                 if (ret_sel < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le poll du père\n");
                     break;
@@ -613,7 +697,7 @@ int main(int argc, char *argv[])
 		}
 		}
                break;
-           case 5:
+           case EPOLL_ENGINE:
                  if ( event_count < 0){
                     fprintf(stderr,"Une erreur est survenue! dans le epoll du père\n");
                     break;
