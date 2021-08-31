@@ -13,13 +13,20 @@
 #include <poll.h>
 #include <sys/epoll.h>
 
-#include "test_io.h"
-#include <netdb.h>
+#include <sys/types.h>  
 #include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include <netdb.h> 
 #include <sys/socket.h>
-#define MAX 80
+#include "utils.h"
+#include "test_io.h"
+
+#define MAX_HOST_NAME_SIZE 255
+
 #define PORT 8080
-#define SA struct sockaddr
+#define MAX_PORT_SIZE 6
+#define MAX_NAME_SIZE 255
 #define BUFFSIZE 65536
 //#define false 0;
 #define MAX_EVENTS 5
@@ -28,6 +35,9 @@ void handle_alarm(int number){
   fprintf(stderr, "\n%ld a recu le signal %d (%s)\n", 
     (long) getpid(), number, strsignal(number));	        
 }
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -41,27 +51,30 @@ int main(int argc, char *argv[])
    int ret, ret_sel,fd_max, timeout = 0, bytestosend = 0 ;
    int offset = 0, bytesrecved = 0 ;
    int should_write = 0,i;
-    int sockfd, connfd, len;
+   int sock, data_sd, rt;
    sigset_t pselect_set;
    sigset_t ppoll_set;
    struct timeval out_time;
    struct timespec out_time1,out_time2;
    struct epoll_event event1, event2, events[MAX_EVENTS];
-   struct sockaddr_in servaddr, cli;
+   socklen_t len;
+  struct sockaddr  client, client2;
+   
+   char host[MAX_NAME_SIZE];
    char c;
-   bool with_time = false;
-   bool with_pselect = false;
-   bool with_poll = false;
-   bool with_ppoll = false;
+   char port[MAX_PORT_SIZE];
+   bool with_server = false;
+   bool with_client= false;
    out_time.tv_sec = 3;
-   out_time.tv_usec = 0;
    out_time1.tv_sec=5;
+   out_time.tv_usec = 0;
    out_time1.tv_nsec=10;
    out_time2.tv_sec=10;
    out_time2.tv_nsec=10;
    struct pollfd pfds[2];
    fcntl(0, F_SETFL, O_NONBLOCK );
    fcntl(1, F_SETFL, O_NONBLOCK );
+   
    FD_ZERO(&readset);
    FD_ZERO(&writeset);
    memset(buffer, 0, BUFFSIZE); 
@@ -71,39 +84,88 @@ int main(int argc, char *argv[])
     
    
    
-   while ((c = getopt(argc, argv, "tpolesc")) != -1){
+   while ((c = getopt(argc, argv, "tpolescP:h:")) != -1){
       
       switch (c){
          case 't':
-           // with_time = true;
             engine = SELECT_WITH_TIME_ENGINE;
             break;
          case 'p':
-            with_pselect = true;
             engine = PSELECT_ENGINE;
             break;
          case 'o':
-            //with_poll =true;
             engine = POLL_ENGINE;
             break;
          case 'l':
-            with_ppoll = true;
             engine = PPOLL_ENGINE;
             break;
          case 'e':
             engine = EPOLL_ENGINE;
             break;
          case 's':
-            engine = SERVER_ENGINE;
+            with_server =true;
             break;
          case 'c':
-            engine = CLIENT_ENGINE;
+             with_client =true;
             break;
-         default:
+         
+            break;
+         case 'P':
+	     strncpy(port, optarg, MAX_PORT_SIZE);
+	    break;
+	 case 'h':
+	     strncpy(host, optarg, MAX_NAME_SIZE);
+	    break;
+	 default:
             engine = NO_ENGINE;
-            break;
       }
    }
+   
+   /* Recupération des paramètres de configuration du client et du serveur*/
+    while((c = getopt(argc, argv, "P:h:")) != -1) {
+	    switch(c){
+	      case 'P':
+		 strncpy(port, optarg, MAX_PORT_SIZE);
+		break;
+	      case 'h':
+		strncpy(host, optarg, MAX_NAME_SIZE);
+		break;
+	      default:
+		break;  
+	    }
+    }
+       
+    if(with_client){
+          data_sd =  TCP_Connect(AF_INET, host, port);
+       if(data_sd < 0 ){
+          fprintf(stderr, "Echec de la tentative de connection au serveur\n");
+          fprintf(stderr, "%s\n", strerror(errno));
+       }
+          printf("connection au serveur réussie\n");
+          fd_max =data_sd;
+          fcntl(data_sd, F_SETFL, O_NONBLOCK );
+      }
+     
+      if(with_server){	       
+	   sock = tcp_listen(host, port);
+	   fcntl(sock, F_SETFL, O_NONBLOCK );
+	   FD_SET(sock, &readset);
+	   /*
+           * Une client tente de se connecter sur sock1
+           */
+	   if(FD_ISSET(sock, &readset)){
+               data_sd = accept(sock, (struct sockaddr*)&client, &len);
+               FD_CLR(sock, &readset);
+          }
+           
+	   if(data_sd < 0){
+	      fprintf(stderr, "failed to accept incomming connection (%s)\n", strerror(errno));
+	      exit(1);
+	   }
+	     printf("connection au client réussie\n");
+	    
+            
+     }
    
    if ((pipe(pfd) == -1)){
       fprintf(stderr, "Erreur lors de la création du pipe\n");
@@ -408,26 +470,36 @@ int main(int argc, char *argv[])
   {
      long bytessent = 0;
      long bytesread = 0;
-     if(with_pselect)
+     if(engine=PSELECT_ENGINE)
         if (signal(SIGALRM, handle_alarm) == SIG_ERR)
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
-     if(with_ppoll)
+     if( engine=PPOLL_ENGINE)
         if (signal(SIGALRM, handle_alarm) == SIG_ERR)
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
+          
+      
+          
+     
 
      while(1){
+     
+     
+     
+      
      	switch(engine){
      	   case SELECT_WITH_TIME_ENGINE:
      	  // case 1:
            case PSELECT_ENGINE:
-     	     fd_max = 0;
+     	    // fd_max = 0;
+     	    // FD_SET(data_sd, &readfds);
+            // FD_SET(data_sd, &writefds);
              FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
              if (pfd[1] > fd_max)
                 fd_max = pfd[1];
              break;
            case POLL_ENGINE:
-           case 4:
+           case PPOLL_ENGINE:
               pfds[0]=(struct pollfd){
                  .fd=0,
                  .events = POLLIN | POLLERR,
@@ -472,40 +544,7 @@ int main(int argc, char *argv[])
 		    return 1;
 		  }
 		break;
-           case CLIENT_ENGINE :
-              
-              //Creation de la socket et verification
-              sockfd = socket(AF_INET, SOCK_STREAM, 0);
-		       
-	      if (sockfd == -1) {
-		  printf("Echec de creation du socket...\n");
-		  exit(0);
-	      }
-	     else
-		printf("Socket correctement crée..\n");
-		//bzero(&servaddr, sizeof(servaddr));
-		// assign IP, PORT
-		servaddr.sin_family = AF_INET;
-               servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-      	       servaddr.sin_port = htons(PORT);
-	     break;
-	     
-	  case  SERVER_ENGINE:
-	        //Creation de la socket et verification
-              sockfd = socket(AF_INET, SOCK_STREAM, 0);
-		       
-	      if (sockfd == -1) {
-		  printf("Echec de creation du socket...\n");
-		  exit(0);
-	      }
-	     else
-		printf("Socket correctement crée..\n");
-		bzero(&servaddr, sizeof(servaddr));
-		// assign IP, PORT
-		servaddr.sin_family = AF_INET;
-                servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-      	        servaddr.sin_port = htons(PORT);
-	     break;
+         
 	  default:
 		break;
 	    }
@@ -534,44 +573,8 @@ int main(int argc, char *argv[])
                event_count= epoll_wait(epoll_fd, events,MAX_EVENTS,1);
                
                break;
-           case CLIENT_ENGINE:
-              // connection du socket client au socket serveur
-		if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
-			printf("Echec de la connexion au serveur...\n");
-			exit(0);
-		}
-		else
-			printf("Connexion reussi..\n");
-	      break;
-           case SERVER_ENGINE:
-                // Binding newly created socket to given IP and verification
-		if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
-			printf("socket bind failed...\n");
-			exit(0);
-		}
-		else
-			printf("Socket successfully binded..\n");
-
-		// Now server is ready to listen and verification
-		if ((listen(sockfd, 5)) != 0) {
-			printf("Listen failed...\n");
-			exit(0);
-		}
-		else
-			printf("Server listening..\n");
-		len = sizeof(cli);
-		// Accept the data packet from client and verification
-	   // Accept the data packet from client and verification
-		 connfd = accept(sockfd, (SA*)&cli, &len);
-	         if (connfd < 0) {
-			printf("server acccept failed...\n");
-			exit(0);
-	         }
-	        else
-			printf("server acccept the client...\n");
-			
-		break;
-
+           
+         
            default:
                break;
         }
@@ -777,3 +780,4 @@ int main(int argc, char *argv[])
   return 0;
    
 }
+
