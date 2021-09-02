@@ -58,11 +58,11 @@ int tcp_listen(char *server_ipaddr, char *server_port){
   sd = socket(AF_INET, SOCK_STREAM,0);
   if(sd == -1){
     perror("socket échec !!");
-    exit(1);
+    return -1;
   }
   if(resolve_address(&server_addr, &salen, server_ipaddr, server_port, 
       AF_INET, SOCK_STREAM, IPPROTO_TCP)!= 0){
-      fprintf(stderr, "Erreur de configuration de sockaddr\n");
+      perror("Erreur de configuration de sockaddr\n");
       return -1;
   }
   if(bind(sd, &server_addr, salen) < 0){
