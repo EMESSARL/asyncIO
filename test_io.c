@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
     
        
     if(with_client){
-          data_sd =  TCP_Connect(AF_INET, host, port);
+       data_sd =  TCP_Connect(AF_INET, host, port);
        if(data_sd < 0 ){
           fprintf(stderr, "Echec de la tentative de connection au serveur\n");
           fprintf(stderr, "%s\n", strerror(errno));
@@ -135,16 +135,14 @@ int main(int argc, char *argv[])
        FD_SET(data_sd, &writeset);
       }
      
-      if(with_server){	       
-	   sock = tcp_listen(host, port);
-	   if(sock  < 0){
-	      printf("failed to listen");
-	      return -1;
-	   }
-	   fcntl(sock, F_SETFL, O_NONBLOCK );
-	   
-	   
-     }
+    if(with_server){	       
+        sock = tcp_listen(host, port);
+	if(sock  < 0){
+	   printf("failed to listen");
+	   return -1;
+	}
+	fcntl(sock, F_SETFL, O_NONBLOCK );	   
+   }
    
    if ((pipe(pfd) == -1)){
       fprintf(stderr, "Erreur lors de la création du pipe\n");
@@ -168,7 +166,7 @@ int main(int argc, char *argv[])
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
       
       while (1){
-      
+     
          switch(engine){
      	   case SELECT_WITH_TIME_ENGINE:
      	  // case PSELECT_ENGINE:
@@ -453,10 +451,10 @@ int main(int argc, char *argv[])
   {
      long bytessent = 0;
      long bytesread = 0;
-     if(engine=PSELECT_ENGINE)
+     if(engine==PSELECT_ENGINE)
         if (signal(SIGALRM, handle_alarm) == SIG_ERR)
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
-     if( engine=PPOLL_ENGINE)
+     if( engine==PPOLL_ENGINE)
         if (signal(SIGALRM, handle_alarm) == SIG_ERR)
           fprintf(stderr, "Signal %d non capture\n", SIGALRM);
           
@@ -465,18 +463,14 @@ int main(int argc, char *argv[])
      
 
      while(1){
-     
-     
-     
-      
+    
      	switch(engine){
      	   case SELECT_WITH_TIME_ENGINE:
            case PSELECT_ENGINE:
              if(with_server){
      	         fd_max = sock ;
      	         FD_SET(sock, &readset);
-     	          printf("connection au client failed\n");
-              }
+             }
              FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
              if (pfd[1] > fd_max)
@@ -577,18 +571,13 @@ int main(int argc, char *argv[])
 		 
                    if(FD_ISSET(sock, &readset)){
                        printf("Try to accept connexion\n");
-    	      	       data= accept(sock, (struct sockaddr*)&client, &len);
+    	      	       data = accept(sock, (struct sockaddr*)&client, &len);
     		       FD_CLR(sock, &readset);
     		    
     		       if(data>0)
-                         printf("connection au client reussie\n");
-                       
-                      printf("connection au client failed\n");
-                      
-                  }
-                   
-                  printf("connection au client failed\n");
-		   if(FD_ISSET(0, &readset)){
+                         printf("connection au client reussie\n");                      
+                  } 
+		  if(FD_ISSET(0, &readset)){
 		      if(!bytestosend){
 		         ret = read(0, buffer, BUFFSIZE);
 		         if(ret < 0)
