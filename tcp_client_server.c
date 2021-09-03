@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
      	         if(should_write_data_sd){
      	           
      	           fd_max = MAX(data_sd, sock) ;
-     	           FD_SET(data_sd, &writeset);
+     	           FD_SET(data_sd, &readset);
      	         }
              }
              FD_SET(0, &readset);
@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
                     if(FD_ISSET(data_sd, &readset)){
                     
                         if(!bytestosend){
-		           ret = read(0, buffer, BUFFSIZE);
+		           ret = read(data_sd, buffer, BUFFSIZE);
 		           if(ret < 0)
 		             fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
 		           else if(ret>0){
@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
 		          }else{
 		            should_write = 0;
 		            offset = 0;
-		            fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
+		          //  fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
 		          //memset(buffer, 0, BUFFSIZE); 
 		          }              
 		       }
