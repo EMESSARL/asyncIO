@@ -64,7 +64,8 @@ int main(int argc, char *argv[])
    char c;
    char port[MAX_PORT_SIZE];
    bool with_server = false;
-   bool with_client= false;
+   bool with_client = false;
+   bool  should_write_data_sd = false;
    out_time.tv_sec = 3;
    out_time1.tv_sec=5;
    out_time.tv_usec = 0;
@@ -129,13 +130,11 @@ int main(int argc, char *argv[])
           return 1;
        }
        printf("connection au serveur réussie\n");
-       fd_max =data_sd;
+       //fd_max =data_sd;
        fcntl(data_sd, F_SETFL, O_NONBLOCK );
-       FD_SET(data_sd, &readset);
-       FD_SET(data_sd, &writeset);
       }
      
-    if(with_server){	       
+   if(with_server){	       
         sock = tcp_listen(host, port);
 	if(sock  < 0){
 	   printf("failed to listen");
@@ -161,7 +160,7 @@ int main(int argc, char *argv[])
    if (pid == 0){
       long bytesrecv = 0;
       long byteswrite = 0;
-      fd_max = 0;
+      
       pid_t ppid = getppid();
       close(pfd[1]); //fermer l'extrémité de lecture pour éviter des comportements bizarres
       
@@ -171,13 +170,14 @@ int main(int argc, char *argv[])
      	   case SELECT_WITH_TIME_ENGINE:
      	  // case PSELECT_ENGINE:
      	   case PSELECT_ENGINE:
+     	      fd_max = 0;
               if(with_client){
-                 fd_max = data_sd ;
-     	         FD_SET(data_sd, &readset);
-                 FD_SET(data_sd, &writeset);
-              }     
+                
+                fd_max = data_sd ;
+                FD_SET(data_sd, &writeset);
+              }   
      	      FD_SET(1, &writeset);
-              fd_max = 1;
+              //fd_max = 1;
               FD_SET(pfd[0], &readset);
               if (pfd[0] > fd_max)
                   fd_max = pfd[0];
@@ -236,10 +236,9 @@ int main(int argc, char *argv[])
          
         switch(engine){
            case SELECT_WITH_TIME_ENGINE:
+                
                 ret_sel = select(fd_max+1, &readset, &writeset, NULL, NULL);
-                break;
-          // case 1:
-                ret_sel = select(fd_max+1, &readset, &writeset, NULL, &out_time);
+                
                 break;
            case PSELECT_ENGINE:
                 sigaddset(&pselect_set, SIGALRM);
@@ -298,6 +297,35 @@ int main(int argc, char *argv[])
 		       }
 		       //memset(buffer, 0, BUFFSIZE);
 		    }
+		    
+		    if(with_client){
+		      
+		       if(FD_ISSET(data_sd, &writeset)){
+		         
+		         if(should_write){
+		          
+		           int m = write(data_sd, buffer+offset, bytesrecved);
+		           if(m < 0)
+		             fprintf(stderr, "un problème dans le fils %s", strerror(errno));
+		           else {  
+		             byteswrite +=m;
+		             offset +=m;
+		             bytesrecved -= m;
+		             if(!bytesrecved){
+		                should_write = 0;
+		                offset = 0;
+		               
+		             } 
+		             
+		          }
+		          printf("je suis le fils du client et le pere serveur a tout recu");
+		          
+		       }
+		     }   
+		     
+		    }
+		    
+		    
 		    if(FD_ISSET(1, &writeset)){
 		       if(should_write){
 		          int m = write(1, buffer+offset, bytesrecved);
@@ -318,6 +346,7 @@ int main(int argc, char *argv[])
 		 }
 		 FD_CLR(pfd[0], &readset);
 		 FD_CLR(1, &writeset);  
+		 FD_CLR(data_sd, &writeset);
                 break;
            case POLL_ENGINE:
            case PPOLL_ENGINE:
@@ -467,9 +496,15 @@ int main(int argc, char *argv[])
      	switch(engine){
      	   case SELECT_WITH_TIME_ENGINE:
            case PSELECT_ENGINE:
+             fd_max = 0 ;
              if(with_server){
      	         fd_max = sock ;
      	         FD_SET(sock, &readset);
+     	         if(should_write_data_sd){
+     	           
+     	           fd_max = MAX(data_sd, sock) ;
+     	           FD_SET(data_sd, &writeset);
+     	         }
              }
              FD_SET(0, &readset);
              FD_SET(pfd[1], &writeset);
@@ -568,15 +603,38 @@ int main(int argc, char *argv[])
                  break;
                  }
 		 else{
-		 
-                   if(FD_ISSET(sock, &readset)){
+		   if(with_server){
+                    if(FD_ISSET(sock, &readset)){
                        printf("Try to accept connexion\n");
-    	      	       data = accept(sock, (struct sockaddr*)&client, &len);
+    	      	       data_sd = accept(sock, (struct sockaddr*)&client, &len);
     		       FD_CLR(sock, &readset);
     		    
-    		       if(data>0)
+    		       if(data_sd>0)
                          printf("connection au client reussie\n");                      
-                  } 
+                    }  
+                   should_write_data_sd=true;
+                    if(FD_ISSET(data_sd, &readset)){
+                    
+                        if(!bytestosend){
+		           ret = read(0, buffer, BUFFSIZE);
+		           if(ret < 0)
+		             fprintf(stderr, "Il ya eu un problème lors de la lecture\n");
+		           else if(ret>0){
+		            should_write = 1;
+		            bytestosend += ret;
+		            bytesread +=ret;
+		           }
+		           else {
+		      //    fprintf(stderr, "end of father\n");
+		           break;
+		           }
+		        }
+		        else{
+		         if(offset)
+		             fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
+		        }  
+                     }
+                 }
 		  if(FD_ISSET(0, &readset)){
 		      if(!bytestosend){
 		         ret = read(0, buffer, BUFFSIZE);
@@ -588,7 +646,7 @@ int main(int argc, char *argv[])
 		            bytesread +=ret;
 		         }
 		         else {
-		      //    fprintf(stderr, "end of father\n");
+		            fprintf(stderr, "end of father\n");
 		          break;
 		         }
 		      }
@@ -597,7 +655,8 @@ int main(int argc, char *argv[])
 		             fprintf(stderr, "Peut on comblé le vide (%d)(%d)\n", bytestosend, offset);
 		      }    
                    }
-
+                    
+                   
 		    if (FD_ISSET(pfd[1], &writeset))
 		    {
 		       
@@ -617,7 +676,7 @@ int main(int argc, char *argv[])
 		          }else{
 		            should_write = 0;
 		            offset = 0;
-		            //fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
+		            fprintf(stderr, "on a tout envoyé %d\n", bytestosend);
 		          //memset(buffer, 0, BUFFSIZE); 
 		          }              
 		       }
@@ -625,6 +684,8 @@ int main(int argc, char *argv[])
 		 }
 		 
 		 FD_CLR(0, &readset);
+		 FD_CLR(sock, &readset);
+		 FD_CLR(data_sd, &readset);
 		 FD_CLR(pfd[1], &writeset);
                 break;
           
